@@ -1,0 +1,210 @@
+---
+title: "code"
+author: "Diego"
+date: "2024-04-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+idee:   Analizzare il prezzo al variare della superficie dell'appartamento
+        Analizzare il prezzo al variare del numero di letti e bagni.
+
+
+
+ 1) Importo il dataset
+ 
+
+```{r}
+setwd("C:\\Users\\diego\\Desktop\\UNIVERSITA'\\MAGISTRALE\\STATISTICAL LEARNING\\PROGETTO")
+data <- read.csv("NY-House-Dataset.csv")
+```
+
+2) Analizzo il dataset
+
+
+```{r}
+
+dim(data)
+summary(data)                             #alcune statistiche delle variabili
+missing_values <- colSums(is.na(data))    #controllo se ci sono valori mancanti
+print(missing_values)
+```
+
+
+Non ci sono valori NaN.
+Già dal summary si può notare come i valori medi dei letti, bagni e della superficie siano molto lontani dai valori massimi.
+Inoltre non so perchè ma alcune osservazioni della variabile bagni hanno un valore fisso di 2.373861. 
+
+
+
+
+
+
+```{r}
+table(data$TYPE)
+frequenze <- sort(table(data$TYPE))
+barplot(frequenze, main = "Istogramma delle Frequenze", ylab = "Frequenza", las = 2, col = "red", cex.names = 0.8)
+```
+
+conviene concentrarsi su qualche tipo in particolare ?
+
+
+
+
+```{r}
+
+hist((data$BEDS), main = "NUMERO DI LETTI")               
+hist((data$BATH), main = "NUMERO DI BAGNI")              
+hist((data$PRICE/1000000), main = "PREZZO")             
+hist((data$PROPERTYSQFT), main = "SUPERFICIE")       
+
+
+plot(data$BEDS, data$PRICE/1000000, 
+     xlab = "BEDS", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "blue", pch = 16)  # Colora i punti di blu e utilizza forme circolari
+
+
+plot(data$BATH, data$PRICE/1000000, 
+     xlab = "BATH", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "red", pch = 16)  # Colora i punti di rosso e utilizza forme circolari
+
+plot(data$PROPERTYSQFT, data$PRICE/1000000, 
+     xlab = "SURFACE", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "green", pch = 16)  # Colora i punti di verde e utilizza forme circolari
+```
+
+Anche a livello di prezzo le osservazioni sono quasi tutte concentrate sotto i 10 milioni.
+Provo a filtrare i dati in base al prezzo, ai letti, ai bagni e alla superficie
+
+```{r}
+
+
+dati_ridotti <- subset(data, data$PRICE < 10000000)
+dati_ridotti <- subset(dati_ridotti, dati_ridotti$BEDS < 10)
+dati_ridotti <- subset(dati_ridotti, dati_ridotti$BATH < 10)
+dati_ridotti <- subset(dati_ridotti, dati_ridotti$PROPERTYSQFT < 10000)
+
+dim(data)
+dim(dati_ridotti)
+
+frequenze2 <- sort(table(dati_ridotti$TYPE))
+barplot(frequenze2, main = "Istogramma delle Frequenze", ylab = "Frequenza", las = 2, col = "red", cex.names = 0.8)
+
+```
+
+
+filtrando i dati il numero di osservazioni rimane comunque normale.
+Provo a rifare i grafici di prima.
+
+
+
+```{r}
+hist(as.integer(dati_ridotti$BEDS), main = "NUMERO DI LETTI")               #istogramma del numero di letti
+hist(as.integer(dati_ridotti$BATH), main = "NUMERO DI BAGNI")               #istogramma del numero dei bagni
+hist(as.integer(dati_ridotti$PRICE/1000000), main="PREZZO DELLE CASE")             #istogramma dei prezzi  (in milioni)
+hist(as.integer(dati_ridotti$PROPERTYSQFT), main= "SUPERFICIE")       #istogramma della grandezza della casa
+
+plot(dati_ridotti$BEDS, dati_ridotti$PRICE/1000000, 
+     xlab = "BEDS", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "blue", pch = 16)  # Colora i punti di blu e utilizza forme circolari
+
+
+plot(dati_ridotti$BATH, dati_ridotti$PRICE/1000000, 
+     xlab = "BATH", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "red", pch = 16)  # Colora i punti di rosso e utilizza forme circolari
+
+plot(dati_ridotti$PROPERTYSQFT, dati_ridotti$PRICE/1000000, 
+     xlab = "SURFACE", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "green", pch = 16)  # Colora i punti di verde e utilizza forme circolari
+
+
+
+```
+
+Magari potrebbe essere interessabte filtrare anche in base al tipo di casa in vendita. Ad esempio provo a fare Co-op for sale 
+
+```{r}
+Co_op <- subset(data, data$TYPE=="Co-op for sale")
+dim(Co_op)
+
+plot(Co_op$PRICE/10000000)
+plot(Co_op$BEDS)
+plot(Co_op$BATH)
+plot(Co_op$PROPERTYSQFT)
+
+plot(Co_op$BEDS, Co_op$PRICE/1000000, 
+     xlab = "BEDS", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "blue", pch = 16)  # Colora i punti di blu e utilizza forme circolari
+
+
+plot(Co_op$BATH, Co_op$PRICE/1000000, 
+     xlab = "BATH", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "red", pch = 16)  # Colora i punti di rosso e utilizza forme circolari
+
+plot(Co_op$PROPERTYSQFT, Co_op$PRICE/1000000, 
+     xlab = "SURFACE", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "green", pch = 16)  # Colora i punti di verde e utilizza forme circolari
+
+
+
+```
+
+anche in questo caso è presente qualche outlier. Provo un po' a filtrare la popolazione.
+
+```{r}
+
+
+dim(Co_op)
+
+Co_op_filtrato <- subset(Co_op, Co_op$PRIC<1000000)
+Co_op_filtrato <- subset(Co_op_filtrato, Co_op_filtrato$BEDS<5)
+Co_op_filtrato <- subset(Co_op_filtrato, Co_op_filtrato$BATH<5)
+Co_op_filtrato <- subset(Co_op_filtrato, Co_op_filtrato$PROPERTYSQFT<3000)
+
+dim(Co_op_filtrato)
+
+
+```
+Rifaccio i grafici
+
+
+```{r}
+hist(Co_op_filtrato$PRICE/1000000)
+hist(Co_op_filtrato$BEDS)
+hist(Co_op_filtrato$BATH)
+hist(Co_op_filtrato$PROPERTYSQFT)
+
+plot(Co_op_filtrato$BEDS, Co_op_filtrato$PRICE/1000000, 
+     xlab = "BEDS", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "blue", pch = 16)  # Colora i punti di blu e utilizza forme circolari
+
+
+plot(Co_op_filtrato$BATH, Co_op_filtrato$PRICE/1000000, 
+     xlab = "BATH", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "red", pch = 16)  # Colora i punti di rosso e utilizza forme circolari
+
+plot(Co_op_filtrato$PROPERTYSQFT, Co_op_filtrato$PRICE/1000000, 
+     xlab = "SURFACE", ylab = "PRICE",
+     main = "Prezzo delle Case in Base al Numero di Letti",
+     col = "green", pch = 16)  # Colora i punti di verde e utilizza forme circolari
+```
+
+
+```
+
+
