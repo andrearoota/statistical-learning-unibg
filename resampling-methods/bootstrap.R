@@ -2,7 +2,7 @@ install.packages("fastDummies")
 
 library(readr)
 library(fastDummies)
-library( boot )
+library(boot)
 
 
 set.seed(123) # Imposta il seed per la riproducibilità
@@ -54,4 +54,7 @@ fun_boot <- function(data,index){
 fun_boot(df,1:dim(df)[1])
 fun_boot(df, sample(dim(df)[1], floor(dim(df)[1]*0.7), replace = TRUE));
 
-boot(df,fun_boot,R = 1000);
+bootstrap_result <- boot(df,fun_boot,R = 3);
+View(bootstrap_result)
+plot(bootstrap_result)
+
