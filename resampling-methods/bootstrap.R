@@ -3,6 +3,7 @@ install.packages("fastDummies")
 library(readr)
 library(fastDummies)
 library(boot)
+library(dplyr)
 
 
 set.seed(123) # Imposta il seed per la riproducibilità
@@ -10,8 +11,11 @@ set.seed(123) # Imposta il seed per la riproducibilità
 df <- read_csv("dataset/NY-House-Dataset 2.csv")
 
 ## Missing data
-missing_values <- colSums(is.na(df))
-print(missing_values)
+colSums(is.na(df))
+
+## Unique values
+sapply(df, function(x) n_distinct(x))
+
 
 ## Remove unused column
 df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
