@@ -17,17 +17,18 @@ df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIV
 ## Filter data
 
 vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
+df_filtered <- df
 
 for (var in vars){
   
-  Q1 <- quantile(df[[var]], 0.25)
-  Q3 <- quantile(df[[var]], 0.75)
+  Q1 <- quantile(df_filtered[[var]], 0.25)
+  Q3 <- quantile(df_filtered[[var]], 0.75)
   
   IQR <- Q3-Q1
   lower_limit <- Q1-1.5*IQR
-  upper_limit <- Q3+1.0*IQR
+  upper_limit <- Q3+1.5*IQR
   
-  df_filtered <- df[df[[var]] >= lower_limit & df[[var]] <= upper_limit, ]
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
   
 }
 
