@@ -5,6 +5,7 @@ library(readr)
 set.seed(123)
 
 df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
+df <- df[, -1]
 
 ## Test 30 - Train 70
 train <- sample(dim(df)[1], round(dim(df)[1]*0.7))

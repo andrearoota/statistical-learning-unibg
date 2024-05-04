@@ -7,6 +7,7 @@ library(dplyr)
 set.seed(123)
 
 df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
+df <- df[, -1]
 
 ##### LINEAR MULTIPLE REGRESSION ##### 
 # perform bootstrap simulation

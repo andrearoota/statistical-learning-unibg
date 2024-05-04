@@ -27,7 +27,6 @@ vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
 df_filtered <- df
 
 for (var in vars){
-  
   Q1 <- quantile(df_filtered[[var]], 0.25)
   Q3 <- quantile(df_filtered[[var]], 0.75)
   
@@ -36,7 +35,6 @@ for (var in vars){
   upper_limit <- Q3+1.5*IQR
   
   df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
-  
 }
 
 # Convert categorical variables into dummy variables
@@ -45,4 +43,6 @@ df <- dummy_cols(df_filtered)
 df <- df[, !(names(df) %in% c("BROKERTITLE", "TYPE", "SUBLOCALITY"))]
 
 # Save data
+df <- df[, -1]
+
 write.csv(df, "dataset/NY-House-Dataset 2 - clean.csv")
