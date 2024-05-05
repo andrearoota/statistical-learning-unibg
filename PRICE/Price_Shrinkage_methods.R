@@ -1,5 +1,5 @@
 install.packages("glmnet")
-
+library(readr)
 library ( ISLR2 )
 library( boot )
 library( glmnet )
@@ -28,9 +28,13 @@ opt_lambda <- cv_model$lambda.min; # cv_model$lambda.1se
 # predict on test dataset
 model <- glmnet(x[train,],y[train],alpha = 0,lambda = opt_lambda,standardize=TRUE)
 fitt_value <- predict(model,newx = x[-train,])
-plot(fitt_value)
+true_values <- df$PRICE[-train]
+dev.new()
+plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
+     main = "Confronto tra Previsioni e Valori Veri")
+abline(a = 0, b = 1, col = "red")
 
-test_MSE = mean((y[-train] - fitt_value)^2)
+test_MSE_ridge = mean((y[-train] - fitt_value)^2)
 
 
 
@@ -44,4 +48,9 @@ opt_lambda <- cv_lasso$lambda.min;
 # use full datasets
 model <- glmnet(x[train,],y[train],alpha = 1,lambda = opt_lambda)
 fitt_value <- predict(model,s=opt_lambda, newx=x[-train,])
-test_MSE = mean((y[-train] - fitt_value)^2)
+true_values <- df$PRICE[-train]
+dev.new()
+plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
+     main = "Confronto tra Previsioni e Valori Veri")
+abline(a = 0, b = 1, col = "red")
+test_MSE_lasso = mean((y[-train] - fitt_value)^2)
