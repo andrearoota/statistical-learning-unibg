@@ -28,6 +28,7 @@ opt_lambda <- cv_model$lambda.min; # cv_model$lambda.1se
 # predict on test dataset
 model <- glmnet(x[train,],y[train],alpha = 0,lambda = opt_lambda,standardize=TRUE)
 fitt_value <- predict(model,newx = x[-train,])
+plot(fitt_value)
 
 test_MSE = mean((y[-train] - fitt_value)^2)
 

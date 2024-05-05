@@ -16,11 +16,11 @@ fun_boot <- function(data,index){
   return (lm_fit$coefficients)
 }
 
-# test function rm
 fun_boot(df,1:dim(df)[1])
 fun_boot(df, sample(dim(df)[1], floor(dim(df)[1]*0.7), replace = TRUE));
 
 bootstrap_result <- boot(df,fun_boot,R = 3);
 View(bootstrap_result)
+print(bootstrap_result$t)
 dev.new()
 plot(bootstrap_result)
