@@ -16,8 +16,8 @@ y <- df$PRICE
 
 
 
-#train <- sample(dim(x)[1],floor(dim(x)[1]*0.75),replace = FALSE);
-train <- sample(nrow(x),floor(nrow(x)*0.5),replace = FALSE);
+train <- sample(dim(x)[1],floor(dim(x)[1]*0.7),replace = FALSE);
+
 
 # lambda = seq() parameters is optional 
 cv_model <- cv.glmnet(x[train, ],y[train], alpha = 0, nfolds = 10);
@@ -35,7 +35,7 @@ plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
 abline(a = 0, b = 1, col = "red")
 
 test_MSE_ridge = mean((y[-train] - fitt_value)^2)
-
+correlation <- cor(fitt_value, true_values)
 
 
 #LASSO
@@ -54,3 +54,24 @@ plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri")
 abline(a = 0, b = 1, col = "red")
 test_MSE_lasso = mean((y[-train] - fitt_value)^2)
+correlation <- cor(fitt_value, true_values)
+
+
+#boostrap
+
+
+fun_boot <- function(data,index){
+  cv_lasso <- cv.glmnet(x[index,],y[index],alpha=1,nfolds = 10);
+  opt_lambda <- cv_lasso$lambda.min;
+  model <- glmnet(x[index,],y[index],alpha = 1,lambda = opt_lambda)
+  fitt_value <- predict(model,s=opt_lambda, newx=x[-index,])
+  true_values <- df$PRICE[-index]
+  test = mean((y[-index] - fitt_value)^2)
+  corr <- cor(fitt_value, true_values)
+  return (test)
+}
+
+fun_boot(df, sample(dim(x)[1],floor(dim(x)[1]*0.7),replace = FALSE));
+
+bootstrap_result <- boot(df,fun_boot,R = 3)
+bootstrap_result$t

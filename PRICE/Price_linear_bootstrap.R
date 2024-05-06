@@ -10,6 +10,7 @@ df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
 df <- df[, -1]
 
 ##### LINEAR MULTIPLE REGRESSION ##### 
+
 # perform bootstrap simulation
 fun_boot <- function(data,index){
   lm_fit <- lm(PRICE ~ ., data = data, subset = index)

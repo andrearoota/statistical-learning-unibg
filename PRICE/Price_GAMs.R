@@ -3,6 +3,7 @@ install.packages('akima')
 library(foreach)
 library(gam)
 library(akima)
+library(readr)
 
 
 set.seed(123)
@@ -14,17 +15,20 @@ df <- df[, -1]
 
 
 train <- sample(dim(df)[1], round(dim(df)[1]*0.7))
-gam_model <- gam(PRICE ~ s(BEDS,4) + PROPERTYSQFT + BATH, data = df[train,]); 
-dev.new()
-plot(gam_model,se=TRUE)
-
+gam_model <- gam(PRICE ~ s(BEDS,4) + lo(PROPERTYSQFT, span=0.7) + s(BATH,3)+ lo(LONGITUDE, span=0.7)+., data = df[train,]); 
 pred_value <- predict(gam_model,newdata = df[-train,])
-plot(df$PRICE[-train],pred_value)
+true_values <- df$PRICE[-train]
+dev.new()
+plot(pred_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
+     main = "Confronto tra Previsioni e Valori Veri")
+abline(a = 0, b = 1, col = "red")
+
+err = (df$PRICE - predict(gam_model, df))^2
+training_err = mean(err[train])
+test_err_GAMs = mean(err[-train])
+
+correlation <- cor(pred_value, true_values)
 
 
-# add local regression with span = 0.7
-gam_model2 <- gam(PRICE ~ s(BEDS,4) + lo(PROPERTYSQFT, span = 0.7) + BATH,data = df[train,])
-plot(gam_model2,se=TRUE)
 
-pred_value2 <- predict(gam_model2,newdata = df[-train,])
-plot(df$PRICE[-train],pred_value2)
+
