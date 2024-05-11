@@ -3,11 +3,36 @@ library(readr)
 library ( ISLR2 )
 library( boot )
 library( glmnet )
-
+library(fastDummies)
 set.seed(123)
 
-df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
+df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
+df <- df[, -1]
+df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
+
+vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
+df_filtered <- df
+
+for (var in vars){
+  Q1 <- quantile(df_filtered[[var]], 0.25)
+  Q3 <- quantile(df_filtered[[var]], 0.75)
+  
+  IQR <- Q3-Q1
+  lower_limit <- Q1-2*IQR
+  upper_limit <- Q3+2*IQR
+  
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
+}
+
+df <- dummy_cols(df_filtered)
+df <- df[, !(names(df) %in% c("TYPE", "SUBLOCALITY"))]
+
+correlation_matrix <- cor(df)[, "PRICE"]
+low_corr_vars <- names(correlation_matrix[abs(correlation_matrix) < 0.05])
+df <- df[, !(names(df) %in% low_corr_vars)]
+
+
 
 x <- model.matrix ( PRICE ~ . , df )
 y <- df$PRICE
