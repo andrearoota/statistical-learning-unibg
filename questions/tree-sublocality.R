@@ -1,5 +1,5 @@
 ## (1) Define the packages that will be needed
-packages <- c('dplyr', 'ggplot2', 'caret', 'visNetwork')
+packages <- c('dplyr', 'ggplot2', 'caret', 'visNetwork', 'gbm')
 
 ## (2) Install them if not yet installed
 installed_packages <- packages %in% rownames(installed.packages())
@@ -11,6 +11,7 @@ if (any(installed_packages == FALSE)) {
 invisible(lapply(packages, library, character.only = TRUE))
 library(readr)
 library(randomForest)
+library(tree)
 
 # Set the seed for reproducibility
 set.seed(123)
@@ -92,13 +93,14 @@ forest <- train(
   # Add repeated cross validation as trControl
   trControl=repeat_cv,
   
+  ntree=500,
+  
   # Accuracy to measure the performance of the model
   metric='Accuracy')
 
 ## Print out the details about the model
 forest$finalModel
 plot(forest$finalModel)
-plot(margin(forest,test_Data$SUB))
 
 ## Get variable importance, and turn into a data frame
 var_imp <- varImp(forest, scale=FALSE)$importance
@@ -149,11 +151,9 @@ plot(forest$finalModel)
 text(forest,pretty = 0)
 
 
-
-## train basic tree
+## train basic tree ##
 # Valuate performance with train and test data sets
 table(df$SUBLOCALITY[training_set])
-
 
 tree_model <- tree( SUBLOCALITY ~ . , training_set, split = "gini", control=tree.control(1866496, mincut = 250, minsize=500))
 
@@ -168,3 +168,59 @@ table(pred_value,testing_set$SUBLOCALITY)
 summary(pred_value)
 plot(pred_value)
 text(pred_value,pretty = 0)
+
+## Boosting ##
+library (gbm)
+ntree = 5000; 
+boost_model <- gbm(SUBLOCALITY ~ . , data = training_set, 
+                   distribution = "gaussian" , n.trees = ntree,
+                   interaction.depth = 4, shrinkage = 0.01 , verbose = F)
+boost_model
+
+yhat <- predict(boost_model, newdata = testing_set, n.trees = ntree)
+plot(testing_set$SUBLOCALITY, yhat, xlab = "Actual SUBLOCALITY", ylab = "Predicted SUBLOCALITY")
+
+## Generate predictions
+y_hats <- predict(
+  
+  ## Random forest object
+  object=boost_model, 
+  
+  ## Data to use for predictions; remove the SUBLOCALITY
+  newdata=testing_set[, -6])
+
+## Print the accuracy
+accuracy <- mean(y_hats == testing_set$SUBLOCALITY)*100
+cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep='')
+
+
+## Bagging ##
+
+#mtry = Number of variables randomly sampled as candidates at each split.
+#ntree = Number of trees to grow.
+bagg_model <- randomForest(SUBLOCALITY ~ . ,data = training_set,
+                           mtry = ncol(training_set)-1, importance = TRUE,replace = TRUE)
+
+bagg_model
+plot(bagg_model)
+
+# Make predictions on the testing set
+yhat <- predict(bagg_model, newdata = testing_set)
+
+# Plot predicted vs actual values
+plot(testing_set$SUBLOCALITY, yhat, xlab = "Actual SUBLOCALITY", ylab = "Predicted SUBLOCALITY")
+abline(0, 1, col = "red")  # Add a line of perfect prediction (y = x)
+
+accuracy <- mean(yhat == testing_set$SUBLOCALITY)*100
+cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep='')
+
+
+# how to change number of tree? 
+# add ntree oprion 
+bagg_model <- randomForest(medv ~ . ,data = Boston, subset = train,
+                           mtry = ncol(Boston)-1, importance = TRUE, ntree = 100)
+bagg_model
+
+importance(bagg_model)
+
+
