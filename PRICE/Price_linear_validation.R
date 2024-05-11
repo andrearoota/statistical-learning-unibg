@@ -6,8 +6,34 @@ library(dplyr)
 # Set the seed for reproducibility
 set.seed(123)
 
-df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
+df <- read_csv("dataset/NY-House-Dataset 2.csv")
+#df <- df[, -1]
+
+df <- df[, !(names(df) %in% c("BROKERTITLE", ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
+
+
+
+vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
+df_filtered <- df
+
+for (var in vars){
+  Q1 <- quantile(df_filtered[[var]], 0.25)
+  Q3 <- quantile(df_filtered[[var]], 0.75)
+  
+  IQR <- Q3-Q1
+  lower_limit <- Q1-1.5*IQR
+  upper_limit <- Q3+1.5*IQR
+  
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
+}
+
+df <- dummy_cols(df_filtered)
+# Remove original columns of categorical variables to avoid multicollinearity
+df <- df[, !(names(df) %in% c("TYPE", "SUBLOCALITY"))]
+
+# Save data
 df <- df[, -1]
+
 
 ## TEST 30 - TRAIN 70
 
@@ -29,7 +55,6 @@ test_err = mean(err[-train])
 
 test_predictions <- predict(lm_fit, newdata = df[-train, ])
 true_values <- df$PRICE[-train]
-
 correlation <- cor(test_predictions, true_values) #correlazione calcolata tra le previsioni fatte dal modello sul set di test e i valori reali del set.
 print(correlation)
 dev.new()

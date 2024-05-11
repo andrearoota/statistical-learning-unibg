@@ -35,6 +35,9 @@ for (var in vars){
   df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
 }
 
+#
+
+
 # Convert categorical variables into dummy variables
 df <- dummy_cols(df_filtered)
 # Remove original columns of categorical variables to avoid multicollinearity

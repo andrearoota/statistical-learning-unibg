@@ -15,7 +15,7 @@ df <- df[, -1]
 
 
 train <- sample(dim(df)[1], round(dim(df)[1]*0.7))
-gam_model <- gam(PRICE ~ s(BEDS,4) + lo(PROPERTYSQFT, span=0.7) + s(BATH,3)+ lo(LONGITUDE, span=0.7)+., data = df[train,]); 
+gam_model <- gam(PRICE ~ s(BEDS,4) + lo(PROPERTYSQFT, span=0.7) + lo(LONGITUDE, span=0.7)+., data = df[train,]); 
 pred_value <- predict(gam_model,newdata = df[-train,])
 true_values <- df$PRICE[-train]
 dev.new()
