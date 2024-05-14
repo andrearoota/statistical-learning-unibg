@@ -28,9 +28,6 @@ for (var in vars){
 df <- dummy_cols(df_filtered)
 df <- df[, !(names(df) %in% c("TYPE", "SUBLOCALITY"))]
 
-correlation_matrix <- cor(df)[, "PRICE"]
-low_corr_vars <- names(correlation_matrix[abs(correlation_matrix) < 0.05])
-df <- df[, !(names(df) %in% low_corr_vars)]
 
 
 
