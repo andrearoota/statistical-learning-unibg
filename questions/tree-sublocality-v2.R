@@ -16,7 +16,7 @@ set.seed(123)
 
 ## Get data ##
 # Read the dataset from CSV file
-df <- read_csv("../dataset/NY-House-Dataset 2.csv")
+df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
 
 # data structure
@@ -37,7 +37,7 @@ for (var in numeric_vars) {
 
 # Correlazione tra variabili numeriche
 correlation_matrix <- cor(df[numeric_vars])
-corrplot(correlation_matrix, method = 'number')
+corrplot(correlation_matrix, method = 'number', title = 'Correlation Matrix')
 
 # Ingegneria delle caratteristiche
 # Creazione di variabili di interazione
@@ -45,7 +45,6 @@ interaction_vars <- c("BEDS:BATH", "BATH:PROPERTYSQFT")
 df <- df %>% 
   mutate(BEDS_BATH_interaction = BEDS * BATH,
          BATH_PROPERTYSQFT_interaction = BATH * PROPERTYSQFT)
-
 
 # Count unique values in each column
 sapply(df, function(x)
@@ -103,6 +102,24 @@ df$SUBLOCALITY <- factor(df$SUBLOCALITY, levels = c(levels(df$SUBLOCALITY), new_
 df$SUBLOCALITY[df$SUBLOCALITY %in% rare_values] <- new_category
 df$SUBLOCALITY <- droplevels(df$SUBLOCALITY)
 
+# Visualizzazione della distribuzione delle variabili numeriche
+numeric_vars <- c("PRICE", "BEDS", "BATH", "PROPERTYSQFT")
+par(mfrow = c(2, 2))
+for (var in numeric_vars) {
+  hist(df[[var]], main = var, xlab = var)
+}
+
+# Correlazione tra variabili numeriche
+correlation_matrix <- cor(df[numeric_vars])
+corrplot(correlation_matrix, method = 'number')
+
+# Visualizzazione della distribuzione delle variabili categoriche
+categorical_vars <- c("SUBLOCALITY", "TYPE")
+par(mfrow = c(1, 2))
+for (var in categorical_vars) {
+  barplot(table(df[[var]]), main = var)
+}
+
 ## Split the data so that we use 70% of it for training
 train_index <- createDataPartition(y = df$SUBLOCALITY,
                                    p = 0.7,
@@ -112,35 +129,37 @@ train_index <- createDataPartition(y = df$SUBLOCALITY,
 training_set <- df[train_index, ]
 testing_set <- df[-train_index, ]
 
-## Define repeated cross validation with 5 folds and three repeats
+## Define repeated cross validation with 5 folds and twenty repeats
 repeat_cv <- trainControl(
   method = 'repeatedcv',
-  number = 10,
+  number = 20,
   repeats = 3,
   allowParallel = TRUE
 )
 
 ## Define number of trees
-ntree <- 500
+ntree <- 5000
 
-## Decision tree
-decision_tree <- train(
+## Classification tree
+classification_tree <- train(
   as.factor(SUBLOCALITY) ~ .,
   data = training_set,
-  method = "ctree",
+  method = "rpart2",
   trControl = repeat_cv,
-  tuneLength = 10
+  tuneLength = 50
 )
-decision_tree
+classification_tree
 
 # Plot the decision tree
-plot(decision_tree)
-plot(decision_tree$finalModel,
-     uniform = TRUE,
-     main = "Decision Tree")
+plot(classification_tree)
+plot(classification_tree$finalModel,
+     compress = TRUE,
+     uniform = TRUE)
+text(classification_tree$finalModel)
+plot(as.party(classification_tree$finalModel))
 
 # Predict the test set
-predictions <- predict(decision_tree, newdata = testing_set, type = "raw")
+predictions <- predict(classification_tree, newdata = testing_set, type = "raw")
 head(predictions)
 confusionMatrix(predictions, testing_set$SUBLOCALITY)
 
@@ -151,7 +170,7 @@ random_forest <- train(
   method = "rf",
   trControl = repeat_cv,
   ntree = ntree,
-  tuneLength = 10
+  tuneLength = 50
 )
 random_forest
 
@@ -171,12 +190,13 @@ bagging <- train(
   method = "treebag",
   trControl = repeat_cv,
   ntree = ntree,
-  tuneLength = 10
+  tuneLength = 50
 )
 bagging
 
 # Plot the bagging
 plot(varImp(bagging))
+plot(bagging$finalModel)
 
 # Predict the test set
 predictions <- predict(bagging, newdata = testing_set, type = "raw")
@@ -197,7 +217,7 @@ boosting <- train(
   method = "gbm",
   trControl = repeat_cv,
   verbose = FALSE,
-  tuneLength = 10,
+  tuneLength = 50,
   tuneGrid = gbmGrid
 )
 boosting
@@ -210,7 +230,7 @@ confusionMatrix(predictions, testing_set$SUBLOCALITY)
 ## Compare models ##
 results <- resamples(
   list(
-    DecisionTree = decision_tree,
+    ClassificationTree = classification_tree,
     RandomForest = random_forest,
     Bagging = bagging,
     Boosting = boosting
@@ -219,4 +239,4 @@ results <- resamples(
 summary(results)
 
 # Plot the results
-bwplot(results)
+bwplot(results, metric = "Accuracy")
