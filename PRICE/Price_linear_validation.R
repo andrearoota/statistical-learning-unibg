@@ -13,12 +13,10 @@ graphics.off()  # close all plot
 
 df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
-df <- df[, -1]
-df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
+df <- df[, !(names(df) %in% c("BROKERTITLE", "ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
 
 vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
 df_filtered <- df
-
 for(var in vars){
   Q1 <- quantile(df_filtered[[var]], 0.25)
   Q3 <- quantile(df_filtered[[var]], 0.75)
@@ -27,10 +25,10 @@ for(var in vars){
   lower_limit <- Q1-2*IQR
   upper_limit <- Q3+2*IQR
   
-  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit &
+  df_filtered[[var]] <= upper_limit, ]
   
 }
-
 
 df <- dummy_cols(df_filtered)
 df <- df[, !(names(df) %in% c("TYPE", "SUBLOCALITY"))]
