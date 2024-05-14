@@ -1,15 +1,15 @@
-library(psych) #for general functions
-library(ggplot2) #for data visualization
-library(caret) #for training and cross validation (also calls other model libaries)
-library(rpart) #for trees
+library(psych) # for general functions
+library(ggplot2) # for data visualization
+library(caret) # for training and cross validation (also calls other model libraries)
+library(rpart) # for trees
 library(rpart.plot) # Enhanced tree plots
 library(RColorBrewer) # Color selection for fancy tree plot
 library(party) # Alternative decision tree algorithm
-library(partykit) #Convert rpart object to BinaryTree
-library(pROC) #for ROC curves
-library(readr) #for reading in data
-library(dplyr) #for data manipulation
-library(corrplot) #for correlation plots
+library(partykit) # Convert rpart object to BinaryTree
+library(pROC) # for ROC curves
+library(readr) # for reading in data
+library(dplyr) # for data manipulation
+library(corrplot) # for correlation plots
 
 # Set the seed for reproducibility
 set.seed(123)
@@ -19,32 +19,34 @@ set.seed(123)
 df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
 
-# data structure
+# Data structure
 head(df, 10)
 
-# sample descriptives
+# Sample descriptives
 describe(df)
 
 # Check for missing data
 colSums(is.na(df))
 
-# Visualizzazione della distribuzione delle variabili numeriche
+# Visualization of the distribution of numerical variables
 numeric_vars <- c("PRICE", "BEDS", "BATH", "PROPERTYSQFT")
 par(mfrow = c(2, 2))
 for (var in numeric_vars) {
   hist(df[[var]], main = var, xlab = var)
 }
 
-# Correlazione tra variabili numeriche
+# Correlation between numerical variables
 correlation_matrix <- cor(df[numeric_vars])
 corrplot(correlation_matrix, method = 'number', title = 'Correlation Matrix')
 
-# Ingegneria delle caratteristiche
-# Creazione di variabili di interazione
+# Feature engineering
+# Creation of interaction variables
 interaction_vars <- c("BEDS:BATH", "BATH:PROPERTYSQFT")
-df <- df %>% 
-  mutate(BEDS_BATH_interaction = BEDS * BATH,
-         BATH_PROPERTYSQFT_interaction = BATH * PROPERTYSQFT)
+df <- df %>%
+  mutate(
+    BEDS_BATH_interaction = BEDS * BATH,
+    BATH_PROPERTYSQFT_interaction = BATH * PROPERTYSQFT
+  )
 
 # Count unique values in each column
 sapply(df, function(x)
@@ -82,38 +84,37 @@ for (var in vars) {
 }
 df <- df_filtered
 
-# Factor
+# Factorize
 df$SUBLOCALITY <- as.factor(df$SUBLOCALITY)
 df$TYPE <- as.factor(df$TYPE)
 
-# Esamina la distribuzione dei valori nella colonna di predizione
+# Examine the distribution of values in the prediction column
 value_counts <- table(df$SUBLOCALITY)
 
-# Identifica i valori che compaiono meno di tre volte
+# Identify values that appear less than three times
 rare_values <- names(value_counts[value_counts < 3])
 
-# Crea una nuova categoria per i valori rari e assegna loro un nuovo valore
+# Create a new category for rare values and assign them a new value
 new_category <- "Others"
 
-# Aggiungi il nuovo livello alla variabile categorica
+# Add the new level to the categorical variable
 df$SUBLOCALITY <- factor(df$SUBLOCALITY, levels = c(levels(df$SUBLOCALITY), new_category))
 
-# Aggiorna il dataset sostituendo i valori rari con il nuovo valore
+# Update the dataset by replacing rare values with the new value
 df$SUBLOCALITY[df$SUBLOCALITY %in% rare_values] <- new_category
 df$SUBLOCALITY <- droplevels(df$SUBLOCALITY)
 
-# Visualizzazione della distribuzione delle variabili numeriche
-numeric_vars <- c("PRICE", "BEDS", "BATH", "PROPERTYSQFT")
+# Visualization of the distribution of numerical variables
 par(mfrow = c(2, 2))
 for (var in numeric_vars) {
   hist(df[[var]], main = var, xlab = var)
 }
 
-# Correlazione tra variabili numeriche
+# Correlation between numerical variables
 correlation_matrix <- cor(df[numeric_vars])
 corrplot(correlation_matrix, method = 'number')
 
-# Visualizzazione della distribuzione delle variabili categoriche
+# Visualization of the distribution of categorical variables
 categorical_vars <- c("SUBLOCALITY", "TYPE")
 par(mfrow = c(1, 2))
 for (var in categorical_vars) {
