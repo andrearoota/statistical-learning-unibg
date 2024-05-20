@@ -75,9 +75,9 @@ df <- df[, !(names(df) %in% c("BROKERTITLE", "TYPE", "SUBLOCALITY"))]
 train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
 #linear regression
-lm_fit <- lm(PRICE ~ ., data = df[train,])
+lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
 fitt_value <- predict(lm_fit, newdata = df[-train, ])
-true_values <- df$PRICE[-train]
+true_values <- log(df$PRICE[-train])
 correlation_linear <- cor(fitt_value, true_values)
 mse_linear <- mean((df$PRICE[-train] - predict(lm_fit, newdata = df[-train, ]))^2)
 
