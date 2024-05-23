@@ -23,9 +23,7 @@ rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
-df <- df[, -1]
 df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
-
 vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
 df_filtered <- df
 
@@ -34,23 +32,20 @@ for (var in vars){
   Q3 <- quantile(df_filtered[[var]], 0.75)
   
   IQR <- Q3-Q1
-  lower_limit <- Q1-2*IQR
-  upper_limit <- Q3+2*IQR
+  lower_limit <- Q1-1.5*IQR
+  upper_limit <- Q3+1.5*IQR
   
   df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
 }
 
 
 df <- dummy_cols(df_filtered)
-df <- df[, !(names(df) %in% c( "TYPE", "SUBLOCALITY"))]
+df <- df[, !(names(df) %in% c( "BROKERTITLE", "TYPE", "SUBLOCALITY"))]
 
-correlation_matrix <- cor(df, use = "complete.obs")
-print(correlation_matrix)
-dev.new()
-corrplot(correlation_matrix, method = "color")
-
-unique_values_all <- sapply(df, unique)
-print(unique_values_all)
+correlation_matrix <- cor(df)
+relevant_variables <- names(which(abs(correlation_matrix["PRICE", ]) >= 0.01))
+relevant_variables <- relevant_variables[relevant_variables != "PRICE"]
+df <- df[, c("PRICE", relevant_variables)]
 
 
 
