@@ -1,4 +1,6 @@
 
+library(caret)
+library(e1071)
 library(readr)
 library(boot)
 library(dplyr)
@@ -92,6 +94,35 @@ dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (GAMs)")
 abline(a = 0, b = 1, col = "red")
+
+
+
+#SVM REGRESSION
+
+x_train <- df[train, -which(names(df) == "PRICE")]
+y_train <- log(df$PRICE[train])
+x_test <- df[-train, -which(names(df) == "PRICE")]
+y_test <- log(df$PRICE[-train])
+
+train_control <- trainControl(method = "cv", number = 10)
+svr_tuned <- train(x_train, y_train, method = "svmRadial", 
+                   trControl = train_control,
+                   tuneLength = 10)
+
+
+best_svr_model <- svr_tuned$finalModel
+
+# Make predictions
+predictions <- predict(best_svr_model, x_test)
+
+# Calculate performance metrics
+mse_svr <- mean((y_test - predictions)^2)
+correlation_svr <- cor(predictions, y_test)
+dev.new
+plot(fitt_value, y_test, xlab = "Previsioni SVR", ylab = "Valori Veri",
+     main = "Confronto tra Previsioni e Valori Veri (SVR)")
+abline(a = 0, b = 1, col = "red")
+
 
 
 #valutazione
