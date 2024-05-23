@@ -1,4 +1,5 @@
 
+library(corrplot)
 library(caret)
 library(e1071)
 library(readr)
@@ -20,12 +21,36 @@ library(dplyr)
 set.seed(123)
 rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
-df <- read_csv("dataset/NY-House-Dataset 2 - clean.csv")
+df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
+df <- df[, -1]
+df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
 
+vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
+df_filtered <- df
+
+for (var in vars){
+  Q1 <- quantile(df_filtered[[var]], 0.25)
+  Q3 <- quantile(df_filtered[[var]], 0.75)
+  
+  IQR <- Q3-Q1
+  lower_limit <- Q1-2*IQR
+  upper_limit <- Q3+2*IQR
+  
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
+}
+
+
+df <- dummy_cols(df_filtered)
+df <- df[, !(names(df) %in% c( "TYPE", "SUBLOCALITY"))]
 
 correlation_matrix <- cor(df, use = "complete.obs")
 print(correlation_matrix)
+dev.new()
+corrplot(correlation_matrix, method = "color")
+
+unique_values_all <- sapply(df, unique)
+print(unique_values_all)
 
 
 
@@ -34,6 +59,10 @@ train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
 #linear regression
 lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
+summary(lm_fit)
+par(mfrow = c(2, 2)
+plot(lm_fit)
+
 fitt_value <- predict(lm_fit, newdata = df[-train, ])
 true_values <- log(df$PRICE[-train])
 correlation_linear <- cor(fitt_value, true_values)
@@ -97,38 +126,9 @@ abline(a = 0, b = 1, col = "red")
 
 
 
-#SVM REGRESSION
-
-x_train <- df[train, -which(names(df) == "PRICE")]
-y_train <- log(df$PRICE[train])
-x_test <- df[-train, -which(names(df) == "PRICE")]
-y_test <- log(df$PRICE[-train])
-
-train_control <- trainControl(method = "cv", number = 10)
-svr_tuned <- train(x_train, y_train, method = "svmRadial", 
-                   trControl = train_control,
-                   tuneLength = 10)
-
-
-best_svr_model <- svr_tuned$finalModel
-
-# Make predictions
-predictions <- predict(best_svr_model, x_test)
-
-# Calculate performance metrics
-mse_svr <- mean((y_test - predictions)^2)
-correlation_svr <- cor(predictions, y_test)
-dev.new
-plot(fitt_value, y_test, xlab = "Previsioni SVR", ylab = "Valori Veri",
-     main = "Confronto tra Previsioni e Valori Veri (SVR)")
-abline(a = 0, b = 1, col = "red")
-
-
-
 #valutazione
 
    
-
   data <- data.frame(
     Method = c("Linear", "Lasso", "Ridge", "GAMs"),
     Correlation = round(c(correlation_linear,correlation_lasso,correlation_ridge,correlation_GAMs),3),
