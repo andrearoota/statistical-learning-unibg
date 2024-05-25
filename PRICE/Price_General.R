@@ -16,15 +16,14 @@ library(knitr)
 library(kableExtra)
 library(dplyr)
 
+
 # load dataset and set seed
 
 set.seed(123)
 rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
-df <- read_csv("dataset/NY-House-Dataset 2.csv")
+df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
-table(df$BROKERTITLE)
-
 
 
 # train 70% 30% test(-train)
@@ -32,10 +31,15 @@ train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
 #linear regression
 lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
+
+#linear regression results
 summary(lm_fit)
-par(mfrow = c(2, 2)
+dev.new()
+par(mfrow = c(2, 2))
 plot(lm_fit)
 
+
+#linear regression correlation and fitted value
 fitt_value <- predict(lm_fit, newdata = df[-train, ])
 true_values <- log(df$PRICE[-train])
 correlation_linear <- cor(fitt_value, true_values)
@@ -44,11 +48,9 @@ dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni linear", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (linear)")
 abline(a = 0, b = 1, col = "red")
+dev.off()
 
-
-
-
-#SHRINKAGE
+#SHRINKAGE METHODS
 
 x <- model.matrix(PRICE ~ ., df)
 y <- log(df$PRICE)  # Applicare la trasformazione logaritmica
