@@ -25,6 +25,29 @@ graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
 
+#dataset histogram
+dev.new()
+par(mfrow = c(2, 2))
+hist(df$PRICE)
+hist(df$BEDS)
+hist(df$BATH)
+hist(df$PROPERTYSQFT)
+
+
+#dataset summary
+summary(df$PRICE)
+summary(df$BATH)
+summary(df$BEDS)
+summary(df$PROPERTYSQFT)
+
+#dataset correlation
+
+cor_matrix <- cor(df)
+cor_matrix_subset <- cor_matrix
+cor_matrix_subset[abs(cor_matrix) <= 0.05 ] <- NA
+
+
+
 
 # train 70% 30% test(-train)
 train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
@@ -43,12 +66,12 @@ plot(lm_fit)
 fitt_value <- predict(lm_fit, newdata = df[-train, ])
 true_values <- log(df$PRICE[-train])
 correlation_linear <- cor(fitt_value, true_values)
-mse_linear <- mean((true_values - fitt_value)^2)
+rmse_linear <- sqrt(mean((true_values - fitt_value)^2))
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni linear", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (linear)")
 abline(a = 0, b = 1, col = "red")
-dev.off()
+
 
 #SHRINKAGE METHODS
 
@@ -57,28 +80,30 @@ y <- log(df$PRICE)  # Applicare la trasformazione logaritmica
 
 # Ridge regression
 cv_model <- cv.glmnet(x[train, ], y[train], alpha = 0, nfolds = 10)
+plot(cv_model)
 opt_lambda <- cv_model$lambda.min
+
+#ridge regression correlation and fitted values
 model <- glmnet(x[train,], y[train], alpha = 0, lambda = opt_lambda, standardize = TRUE)
 fitt_value <- predict(model, s=opt_lambda, newx = x[-train,])
 true_values <- y[-train]
-mse_ridge <- mean((true_values - fitt_value)^2)
+rmse_ridge <- sqrt(mean((true_values - fitt_value)^2))
 correlation_ridge <- cor(fitt_value, true_values)
-
-
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (ridge)")
 abline(a = 0, b = 1, col = "red")
 
-#lasso
-
+#lasso regression
 cv_lasso <- cv.glmnet(x[train,],y[train],alpha=1,nfolds = 10);
+plot(cv_lasso)
 opt_lambda <- cv_lasso$lambda.min;
+
+#lasso regression correlation and fitted values
 model <- glmnet(x[train,],y[train],alpha = 1,lambda = opt_lambda)
-c <- coef(model, s = 0.1)
 fitt_value <- predict(model,s=opt_lambda, newx=x[-train,])
 true_values <- y[-train]
-mse_lasso = mean((true_values - fitt_value)^2)
+rmse_lasso = sqrt(mean((true_values - fitt_value)^2))
 correlation_lasso <- cor(fitt_value, true_values)
 
 dev.new()
@@ -88,18 +113,32 @@ abline(a = 0, b = 1, col = "red")
 
 
 #GAMs
+gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]);
 
-gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]); 
+#gams correlation and fitted values
 fitt_value <- predict(gam_model,newdata = df[-train,])
 true_values <- log(df$PRICE[-train])
 err = (log(df$PRICE) - predict(gam_model, df))^2
-mse_GAMs = mean(err[-train])
+rmse_GAMs = sqrt(mean(err[-train]))
 correlation_GAMs <- cor(fitt_value, true_values)
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (GAMs)")
 abline(a = 0, b = 1, col = "red")
 
+
+#SVR
+
+#train_data <- df[train, ]
+#test_data <- df[-train, ]
+#Y_train <- log(train_data$PRICE)
+#X_train <- train_data[, -which(names(train_data) == "PRICE")]
+#Y_test <- log(test_data$PRICE)
+#X_test <- test_data[, -which(names(test_data) == "PRICE")]
+#svr_model <- svm(x = X_train, y = Y_train, kernel = "radial", gamma = 0.1, cost = 1)
+#predictions <- predict(svr_model, X_test)
+#rmse <- sqrt(mean((predictions - Y_test)^2))
+#correlation_SVR <- cor(predictions, Y_test)
 
 
 #valutazione
@@ -108,12 +147,12 @@ abline(a = 0, b = 1, col = "red")
   data <- data.frame(
     Method = c("Linear", "Lasso", "Ridge", "GAMs"),
     Correlation = round(c(correlation_linear,correlation_lasso,correlation_ridge,correlation_GAMs),3),
-    MSE_Test = round(c(mse_linear,mse_lasso,mse_ridge,mse_GAMs),3)
+    MSE_Test = round(c(rmse_linear,rmse_lasso,rmse_ridge,rmse_GAMs),3)
   )
   
-  data$MSE_Test <- sprintf("%.3f  $^2", data$MSE_Test)
+  data$MSE_Test <- sprintf("%.3f  $", data$MSE_Test)
   
-  table <- kable(data, format = "html", caption = "Correlation and MSEtest") %>%
+  table <- kable(data, format = "html", caption = "Correlation and RMSEtest") %>%
     kable_styling(full_width = FALSE) %>%
     column_spec(1, bold = TRUE) %>%
     column_spec(2:3, width = "4cm") %>%

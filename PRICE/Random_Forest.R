@@ -1,30 +1,59 @@
-# Installa e carica le librerie necessarie
-install.packages("caret")
-install.packages("randomForest")
-library(caret)
-library(randomForest)
 
-# Carica il dataset
-df <- read_csv("dataset/NY-House-Dataset 2.csv")
+library(caret)
+library(e1071)
+library(readr)
+library(randomForest)
+library(tidyverse)
+
+set.seed(123)
+rm(list = ls()) # clear all environment variable
+graphics.off()  # close all plot
+df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
 
-X <- subset(df, select = -c(BROKERTITLE))
-Y <- as.factor(df$BROKERTITLE)
+# Visualizzazione istogrammi
+dev.new()
+par(mfrow = c(2, 2))
+hist(df$PRICE, main = "Histogram of PRICE", xlab = "PRICE")
+hist(df$BEDS, main = "Histogram of BEDS", xlab = "BEDS")
+hist(df$BATH, main = "Histogram of BATH", xlab = "BATH")
+hist(df$PROPERTYSQFT, main = "Histogram of PROPERTYSQFT", xlab = "PROPERTYSQFT")
 
-# Addestra un modello di Random Forest
-set.seed(123) # Per riproducibilità
-rf_model <- train(
-  x = X,
-  y = Y,
-  method = "rf", # Utilizza Random Forest
-  trControl = trainControl(method = "cv", number = 5), # Cross-validation con 5 fold
-  tuneGrid = expand.grid(mtry = c(2, 3, 4)) # Testa diverse combinazioni di mtry
+
+
+
+# Dividere il dataset in training e test set
+set.seed(123)
+train_indices <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
+train_data <- df[train_indices, ]
+test_data <- df[-train_indices, ]
+
+# Creare il modello Random Forest
+repeat_cv <- trainControl(
+  method = 'repeatedcv',
+  number = 20,
+  repeats = 3,
+  allowParallel = TRUE
 )
+random_forest <- train(
+  PRICE ~ .,
+  data = train_data,
+  method = "rf",
+  trControl = repeat_cv,
+  ntree = ntree,
+  tuneLength = 50
+)
+random_forest
+plot(random_forest)
 
+# Prevedere i valori di PRICE nel test set
+predictions <- predict(rf_model, newdata = test_data)
 
-plot(rf_model)
+# Calcolare RMSE
+actual <- test_data$PRICE
+rmse <- sqrt(mean((predictions - actual)^2))
+print(paste("RMSE:", rmse))
 
-
-varImp(rf_model$finalModel)
-
-# Ora puoi utilizzare il modello addestrato per predire la categoria "brokertitle" per le osservazioni con categorie rare
+# Importanza delle variabili
+importance(rf_model)
+varImpPlot(rf_model)
