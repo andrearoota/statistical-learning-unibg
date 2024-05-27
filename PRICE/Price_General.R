@@ -1,4 +1,4 @@
-
+library(tidyverse)
 library(corrplot)
 library(caret)
 library(e1071)
@@ -15,6 +15,10 @@ library(fastDummies)
 library(knitr)
 library(kableExtra)
 library(dplyr)
+library(geosphere)
+library(ggplot2)
+
+library(car)
 
 
 # load dataset and set seed
@@ -24,6 +28,18 @@ rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
+reference_point <- c(-74.0060, 40.7128)
+
+# Calcolo della distanza dal punto di riferimento
+
+df <- df %>%
+  mutate(DISTANZA = distHaversine(cbind(LONGITUDE, LATITUDE), reference_point))
+df <- df %>%
+  mutate(DISTANZA = DISTANZA/1000)
+
+cor(df$PRICE,df$LONGITUDE)
+cor(df$PRICE,df$LATITUDE)
+cor(df$PRICE,df$DISTANZA)
 
 #dataset histogram
 dev.new()
@@ -32,20 +48,57 @@ hist(df$PRICE)
 hist(df$BEDS)
 hist(df$BATH)
 hist(df$PROPERTYSQFT)
-
+hist(df$DISTANZA)
 
 #dataset summary
 summary(df$PRICE)
 summary(df$BATH)
 summary(df$BEDS)
 summary(df$PROPERTYSQFT)
+summary(df$DISTANZA)
 
 #dataset correlation
-
 cor_matrix <- cor(df)
 cor_matrix_subset <- cor_matrix
 cor_matrix_subset[abs(cor_matrix) <= 0.05 ] <- NA
 
+#dataset grafici
+dev.new()
+ggplot(df, aes(x = DISTANZA, y = PRICE)) +
+  geom_point(aes(color = PRICE, size = PRICE)) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Houses price vs distance from the center of manhattan",
+       x = "distance from the center of manhattan(km)",
+       y = "Houses Price (USD)") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+ggplot(df, aes(x = BEDS, y = PRICE)) +
+  geom_point(aes(color = PRICE, size = PRICE)) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Houses Price vs number of beds ",
+       x = "Number of beds",
+       y = "Houses Price (USD)") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+ggplot(df, aes(x = BATH, y = PRICE)) +
+  geom_point(aes(color = PRICE, size = PRICE)) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Houses price vs number of baths",
+       x = "Number of baths",
+       y = "Houses price(USD)") +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+ggplot(df, aes(x = PROPERTYSQFT, y = PRICE)) +
+  geom_point(aes(color = PRICE, size = PRICE)) +
+  scale_color_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Houses price vs propertysqft",
+       x = "Propertysqft",
+       y = "Houses price (USD)") +
+  theme_minimal() +
+  theme(legend.position = "right")
 
 
 
@@ -54,6 +107,7 @@ train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
 #linear regression
 lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
+vif(lm_fit)
 
 #linear regression results
 summary(lm_fit)
@@ -106,6 +160,7 @@ true_values <- y[-train]
 rmse_lasso = sqrt(mean((true_values - fitt_value)^2))
 correlation_lasso <- cor(fitt_value, true_values)
 
+
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (lasso)")
@@ -113,8 +168,8 @@ abline(a = 0, b = 1, col = "red")
 
 
 #GAMs
-gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]);
-
+set.seed(123)
+gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+ s(DISTANZA,4)+., data = df[train,]);
 #gams correlation and fitted values
 fitt_value <- predict(gam_model,newdata = df[-train,])
 true_values <- log(df$PRICE[-train])
@@ -129,16 +184,18 @@ abline(a = 0, b = 1, col = "red")
 
 #SVR
 
-#train_data <- df[train, ]
-#test_data <- df[-train, ]
-#Y_train <- log(train_data$PRICE)
-#X_train <- train_data[, -which(names(train_data) == "PRICE")]
-#Y_test <- log(test_data$PRICE)
-#X_test <- test_data[, -which(names(test_data) == "PRICE")]
-#svr_model <- svm(x = X_train, y = Y_train, kernel = "radial", gamma = 0.1, cost = 1)
-#predictions <- predict(svr_model, X_test)
-#rmse <- sqrt(mean((predictions - Y_test)^2))
-#correlation_SVR <- cor(predictions, Y_test)
+train_data <- df[train, ]
+test_data <- df[-train, ]
+Y_train <- log(train_data$PRICE)
+X_train <- train_data[, -which(names(train_data) == "PRICE")]
+Y_test <- log(test_data$PRICE)
+X_test <- test_data[, -which(names(test_data) == "PRICE")]
+svr_model <- svm(x = X_train, y = Y_train, kernel = "radial", gamma = 0.1, cost = 1)
+predictions <- predict(svr_model, X_test)
+rmse <- sqrt(mean((predictions - Y_test)^2))
+correlation_SVR <- cor(predictions, Y_test)
+
+
 
 
 #valutazione
