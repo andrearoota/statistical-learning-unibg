@@ -1,3 +1,5 @@
+install.packages('performanceEstimation')
+install.packages("psych")
 library(psych) # for general functions
 library(ggplot2) # for data visualization
 library(caret) # for training and cross validation (also calls other model libraries)
@@ -10,6 +12,10 @@ library(pROC) # for ROC curves
 library(readr) # for reading in data
 library(dplyr) # for data manipulation
 library(corrplot) # for correlation plots
+install.packages("kernlab")
+library(kernlab) # for SVM
+library(performanceEstimation) # for SMOTE
+
 
 # Set the seed for reproducibility
 set.seed(123)
@@ -109,9 +115,22 @@ par(mfrow = c(2, 2))
 for (var in numeric_vars) {
   hist(df[[var]], main = var, xlab = var)
 }
+par(mfrow = c(1, 1))
+
+# Apply SMOTE to balance the classes
+balancedDf <- performanceEstimation::smote(SUBLOCALITY ~ ., df, perc.over = 50, perc.under = 100)
+
+# Remove missing values
+balancedDf <- na.omit(balancedDf)
+
+# Check the distribution of the target variable
+table(balancedDf$SUBLOCALITY)
+barplot(table(balancedDf$SUBLOCALITY), main = "Distribution of Classes")
+
+df <- balancedDf
 
 # Correlation between numerical variables
-correlation_matrix <- cor(df[numeric_vars])
+correlation_matrix <- cor(df[numeric_vars], use = "complete.obs")
 corrplot(correlation_matrix, method = 'number')
 
 # Visualization of the distribution of categorical variables
@@ -120,6 +139,7 @@ par(mfrow = c(1, 2))
 for (var in categorical_vars) {
   barplot(table(df[[var]]), main = var)
 }
+par(mfrow = c(1, 1))
 
 ## Split the data so that we use 70% of it for training
 train_index <- createDataPartition(y = df$SUBLOCALITY,
@@ -152,17 +172,26 @@ classification_tree <- train(
 classification_tree
 
 # Plot the decision tree
-plot(classification_tree)
-plot(classification_tree$finalModel,
-     compress = TRUE,
-     uniform = TRUE)
-text(classification_tree$finalModel)
-plot(as.party(classification_tree$finalModel))
+plot(classification_tree, uniform = TRUE, compress = TRUE, main = "Classification Tree")
+rpart.plot(classification_tree$finalModel, main = "Classification Tree", type = 4, extra = 0, xcompact = FALSE, ycompress = TRUE, compress = TRUE, under = TRUE)
 
 # Predict the test set
 predictions <- predict(classification_tree, newdata = testing_set, type = "raw")
 head(predictions)
 confusionMatrix(predictions, testing_set$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+
 
 ## Random forest ##
 random_forest <- train(
@@ -176,13 +205,26 @@ random_forest <- train(
 random_forest
 
 # Plot the random forest
-plot(random_forest)
-plot(random_forest$finalModel, main = "Random Forest")
+plot(random_forest, main = "Random Forest")
+plot(caret::varImp(random_forest), main = "Variable Importance")
 
 # Predict the test set
 predictions <- predict(random_forest, newdata = testing_set, type = "raw")
 head(predictions)
 confusionMatrix(predictions, testing_set$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+
 
 ## Bagging ##
 bagging <- train(
@@ -203,6 +245,18 @@ plot(bagging$finalModel)
 predictions <- predict(bagging, newdata = testing_set, type = "raw")
 head(predictions)
 confusionMatrix(predictions, testing_set$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
 ## Boosting ##
 gbmGrid <-  expand.grid(
@@ -228,6 +282,54 @@ predictions <- predict(boosting, newdata = testing_set, type = "raw")
 head(predictions)
 confusionMatrix(predictions, testing_set$SUBLOCALITY)
 
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+
+
+## Support Vector Machine ##
+# Define the preprocessor
+preProc <- preProcess(training_set, method = c("center", "scale", "zv"))
+
+# Apply the preprocessor to the training and testing sets
+training_set_preprocess <- predict(preProc, training_set)
+testing_set_preprocess <- predict(preProc, testing_set)
+
+svm <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set_preprocess,
+  method = "svmRadial",
+  trControl = repeat_cv,
+  tuneLength = 1
+)
+svm
+
+# Predict the test set
+predictions <- predict(svm, newdata = testing_set_preprocess, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set_preprocess$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set_preprocess$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+
+
 ## Compare models ##
 results <- resamples(
   list(
@@ -241,3 +343,4 @@ summary(results)
 
 # Plot the results
 bwplot(results, metric = "Accuracy")
+
