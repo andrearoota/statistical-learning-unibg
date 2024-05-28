@@ -16,7 +16,6 @@ install.packages("kernlab")
 library(kernlab) # for SVM
 library(performanceEstimation) # for SMOTE
 
-
 # Set the seed for reproducibility
 set.seed(123)
 
@@ -153,13 +152,13 @@ testing_set <- df[-train_index, ]
 ## Define repeated cross validation with 5 folds and twenty repeats
 repeat_cv <- trainControl(
   method = 'repeatedcv',
-  number = 20,
+  number = 10,
   repeats = 3,
   allowParallel = TRUE
 )
 
 ## Define number of trees
-ntree <- 5000
+ntree <- 500
 
 ## Classification tree
 classification_tree <- train(
@@ -167,7 +166,7 @@ classification_tree <- train(
   data = training_set,
   method = "rpart2",
   trControl = repeat_cv,
-  tuneLength = 50
+  tuneLength = 10
 )
 classification_tree
 
@@ -200,7 +199,7 @@ random_forest <- train(
   method = "rf",
   trControl = repeat_cv,
   ntree = ntree,
-  tuneLength = 50
+  tuneLength = 10
 )
 random_forest
 
@@ -233,13 +232,12 @@ bagging <- train(
   method = "treebag",
   trControl = repeat_cv,
   ntree = ntree,
-  tuneLength = 50
+  tuneLength = 10
 )
 bagging
 
 # Plot the bagging
 plot(varImp(bagging))
-plot(bagging$finalModel)
 
 # Predict the test set
 predictions <- predict(bagging, newdata = testing_set, type = "raw")
@@ -272,7 +270,7 @@ boosting <- train(
   method = "gbm",
   trControl = repeat_cv,
   verbose = FALSE,
-  tuneLength = 50,
+  tuneLength = 10,
   tuneGrid = gbmGrid
 )
 boosting
@@ -308,7 +306,7 @@ svm <- train(
   data = training_set_preprocess,
   method = "svmRadial",
   trControl = repeat_cv,
-  tuneLength = 1
+  tuneLength = 10
 )
 svm
 
@@ -343,4 +341,26 @@ summary(results)
 
 # Plot the results
 bwplot(results, metric = "Accuracy")
+
+# Compare models in test set
+test_results <- list(
+  ClassificationTree = confusionMatrix(predict(classification_tree, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
+  RandomForest = confusionMatrix(predict(random_forest, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
+  Bagging = confusionMatrix(predict(bagging, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
+  Boosting = confusionMatrix(predict(boosting, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY)
+)
+test_results
+
+# Plot confusion matrix for test set !!!!!! NOT WORK
+for (model in test_results) {
+  dfConfMatrix <- as.data.frame(model$table)
+  dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+  ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = Freq), vjust = 1) +
+    scale_fill_gradient(low = "white", high = "blue") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+}
 
