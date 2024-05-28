@@ -1,5 +1,6 @@
 install.packages('performanceEstimation')
 install.packages("psych")
+install.packages("ggRandomForests")
 library(psych) # for general functions
 library(ggplot2) # for data visualization
 library(caret) # for training and cross validation (also calls other model libraries)
@@ -15,6 +16,7 @@ library(corrplot) # for correlation plots
 install.packages("kernlab")
 library(kernlab) # for SVM
 library(performanceEstimation) # for SMOTE
+library(ggRandomForests) # for random forest plots
 
 # Set the seed for reproducibility
 set.seed(123)
@@ -124,7 +126,12 @@ balancedDf <- na.omit(balancedDf)
 
 # Check the distribution of the target variable
 table(balancedDf$SUBLOCALITY)
-barplot(table(balancedDf$SUBLOCALITY), main = "Distribution of Classes")
+ggplot(balancedDf, aes(x = SUBLOCALITY)) +
+  geom_bar(fill = "blue") +
+  labs(title = "Distribution of Classes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
 
 df <- balancedDf
 
@@ -206,6 +213,8 @@ random_forest
 # Plot the random forest
 plot(random_forest, main = "Random Forest")
 plot(caret::varImp(random_forest), main = "Variable Importance")
+gg_dta<- gg_error(random_forest$finalModel)
+plot(gg_dta)
 
 # Predict the test set
 predictions <- predict(random_forest, newdata = testing_set, type = "raw")
@@ -237,7 +246,7 @@ bagging <- train(
 bagging
 
 # Plot the bagging
-plot(varImp(bagging))
+plot(varImp(bagging), main = "Variable Importance")
 
 # Predict the test set
 predictions <- predict(bagging, newdata = testing_set, type = "raw")
@@ -340,27 +349,4 @@ results <- resamples(
 summary(results)
 
 # Plot the results
-bwplot(results, metric = "Accuracy")
-
-# Compare models in test set
-test_results <- list(
-  ClassificationTree = confusionMatrix(predict(classification_tree, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
-  RandomForest = confusionMatrix(predict(random_forest, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
-  Bagging = confusionMatrix(predict(bagging, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY),
-  Boosting = confusionMatrix(predict(boosting, newdata = testing_set, type = "raw"), testing_set$SUBLOCALITY)
-)
-test_results
-
-# Plot confusion matrix for test set !!!!!! NOT WORK
-for (model in test_results) {
-  dfConfMatrix <- as.data.frame(model$table)
-  dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
-  ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
-    geom_tile(color = "white") +
-    geom_text(aes(label = Freq), vjust = 1) +
-    scale_fill_gradient(low = "white", high = "blue") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
-}
-
+bwplot(results, metric = "Accuracy", main = "Model Comparison")
