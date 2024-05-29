@@ -41,6 +41,7 @@ par(mfrow = c(2, 2))
 for (var in numeric_vars) {
   hist(df[[var]], main = var, xlab = var)
 }
+par(mfrow = c(1, 1))
 
 # Correlation between numerical variables
 correlation_matrix <- cor(df[numeric_vars])
@@ -319,6 +320,9 @@ svm <- train(
 )
 svm
 
+# Plot the SVM
+plot(svm)
+
 # Predict the test set
 predictions <- predict(svm, newdata = testing_set_preprocess, type = "raw")
 head(predictions)
@@ -343,7 +347,8 @@ results <- resamples(
     ClassificationTree = classification_tree,
     RandomForest = random_forest,
     Bagging = bagging,
-    Boosting = boosting
+    Boosting = boosting,
+    SVM = svm
   )
 )
 summary(results)
