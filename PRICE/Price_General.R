@@ -28,18 +28,18 @@ rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
-reference_point <- c(-74.0060, 40.7128)
+#reference_point <- c(-74.0060, 40.7128)
 
 # Calcolo della distanza dal punto di riferimento
 
-df <- df %>%
-  mutate(DISTANZA = distHaversine(cbind(LONGITUDE, LATITUDE), reference_point))
-df <- df %>%
-  mutate(DISTANZA = DISTANZA/1000)
+#df <- df %>%
+#  mutate(DISTANZA = distHaversine(cbind(LONGITUDE, LATITUDE), reference_point))
+#df <- df %>%
+#  mutate(DISTANZA = DISTANZA/1000)
 
-cor(df$PRICE,df$LONGITUDE)
-cor(df$PRICE,df$LATITUDE)
-cor(df$PRICE,df$DISTANZA)
+#cor(df$PRICE,df$LONGITUDE)
+#cor(df$PRICE,df$LATITUDE)
+#cor(df$PRICE,df$DISTANZA)
 
 #dataset histogram
 dev.new()
@@ -63,15 +63,6 @@ cor_matrix_subset <- cor_matrix
 cor_matrix_subset[abs(cor_matrix) <= 0.05 ] <- NA
 
 #dataset grafici
-dev.new()
-ggplot(df, aes(x = DISTANZA, y = PRICE)) +
-  geom_point(aes(color = PRICE, size = PRICE)) +
-  scale_color_gradient(low = "lightblue", high = "darkblue") +
-  labs(title = "Houses price vs distance from the center of manhattan",
-       x = "distance from the center of manhattan(km)",
-       y = "Houses Price (USD)") +
-  theme_minimal() +
-  theme(legend.position = "right")
 
 ggplot(df, aes(x = BEDS, y = PRICE)) +
   geom_point(aes(color = PRICE, size = PRICE)) +
@@ -107,7 +98,6 @@ train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
 #linear regression
 lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
-vif(lm_fit)
 
 #linear regression results
 summary(lm_fit)
@@ -116,13 +106,17 @@ par(mfrow = c(2, 2))
 plot(lm_fit)
 
 
-#linear regression correlation and fitted value
-fitt_value <- predict(lm_fit, newdata = df[-train, ])
-true_values <- log(df$PRICE[-train])
-correlation_linear <- cor(fitt_value, true_values)
-rmse_linear <- sqrt(mean((true_values - fitt_value)^2))
+log_predictions <- predict(lm_fit, newdata = df[-train, ])
+log_true_values <- log(df$PRICE[-train])
+correlation_log <- cor(log_predictions, log_true_values)
+rmse_log <- sqrt(mean((log_true_values - log_predictions)^2))
+predicted_values <- exp(log_predictions)
+true_values <- df$PRICE[-train]
+correlation_real <- cor(predicted_values, true_values)
+rmse_real <- sqrt(mean((true_values - predicted_values)^2))
+
 dev.new()
-plot(fitt_value, true_values, xlab = "Previsioni linear", ylab = "Valori Veri",
+plot(log_predictions, log_true_values, xlab = "Previsioni linear", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (linear)")
 abline(a = 0, b = 1, col = "red")
 
@@ -134,15 +128,23 @@ y <- log(df$PRICE)  # Applicare la trasformazione logaritmica
 
 # Ridge regression
 cv_model <- cv.glmnet(x[train, ], y[train], alpha = 0, nfolds = 10)
+dev.new()
 plot(cv_model)
 opt_lambda <- cv_model$lambda.min
 
 #ridge regression correlation and fitted values
 model <- glmnet(x[train,], y[train], alpha = 0, lambda = opt_lambda, standardize = TRUE)
+
 fitt_value <- predict(model, s=opt_lambda, newx = x[-train,])
 true_values <- y[-train]
 rmse_ridge <- sqrt(mean((true_values - fitt_value)^2))
 correlation_ridge <- cor(fitt_value, true_values)
+
+fitt_value_real <- exp(fitt_value)
+true_values_real <- exp(true_values)
+rmse_ridge_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
+correlation_ridge_real <- cor(fitt_value_real, true_values_real)
+
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (ridge)")
@@ -150,15 +152,23 @@ abline(a = 0, b = 1, col = "red")
 
 #lasso regression
 cv_lasso <- cv.glmnet(x[train,],y[train],alpha=1,nfolds = 10);
+dev.new()
 plot(cv_lasso)
 opt_lambda <- cv_lasso$lambda.min;
 
 #lasso regression correlation and fitted values
 model <- glmnet(x[train,],y[train],alpha = 1,lambda = opt_lambda)
+
+
 fitt_value <- predict(model,s=opt_lambda, newx=x[-train,])
 true_values <- y[-train]
 rmse_lasso = sqrt(mean((true_values - fitt_value)^2))
 correlation_lasso <- cor(fitt_value, true_values)
+
+fitt_value_real <- exp(fitt_value)
+true_values_real <- exp(true_values)
+rmse_lasso_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
+correlation_lasso_real <- cor(fitt_value_real, true_values_real)
 
 
 dev.new()
@@ -168,14 +178,22 @@ abline(a = 0, b = 1, col = "red")
 
 
 #GAMs
-set.seed(123)
-gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+ s(DISTANZA,4)+., data = df[train,]);
+
+gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]);
+
 #gams correlation and fitted values
 fitt_value <- predict(gam_model,newdata = df[-train,])
 true_values <- log(df$PRICE[-train])
 err = (log(df$PRICE) - predict(gam_model, df))^2
 rmse_GAMs = sqrt(mean(err[-train]))
 correlation_GAMs <- cor(fitt_value, true_values)
+
+
+fitt_value_real <- exp(fitt_value)
+true_values_real <- exp(true_values)
+rmse_GAMs_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
+correlation_GAMs_real <- cor(fitt_value_real, true_values_real)
+
 dev.new()
 plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
      main = "Confronto tra Previsioni e Valori Veri (GAMs)")
@@ -204,10 +222,10 @@ correlation_SVR <- cor(predictions, Y_test)
   data <- data.frame(
     Method = c("Linear", "Lasso", "Ridge", "GAMs"),
     Correlation = round(c(correlation_linear,correlation_lasso,correlation_ridge,correlation_GAMs),3),
-    MSE_Test = round(c(rmse_linear,rmse_lasso,rmse_ridge,rmse_GAMs),3)
+    RMSE_Test = round(c(rmse_linear,rmse_lasso,rmse_ridge,rmse_GAMs),3)
   )
   
-  data$MSE_Test <- sprintf("%.3f  $", data$MSE_Test)
+  data$RMSE_Test <- sprintf("%.3f  $", data$RMSE_Test)
   
   table <- kable(data, format = "html", caption = "Correlation and RMSEtest") %>%
     kable_styling(full_width = FALSE) %>%

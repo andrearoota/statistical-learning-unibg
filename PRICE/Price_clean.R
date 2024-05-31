@@ -41,7 +41,7 @@ df$SUBLOCALITY <- droplevels(df$SUBLOCALITY)
 df$TYPE[df$TYPE %in% rare_values3] <- new_category
 df$TYPE <- droplevels(df$TYPE)
 
-df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
+df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS", "LATITUDE", "LONGITUDE"))]
 
 vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
 df_filtered <- df
