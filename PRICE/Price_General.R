@@ -28,18 +28,39 @@ rm(list = ls()) # clear all environment variable
 graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
-#reference_point <- c(-74.0060, 40.7128)
 
-# Calcolo della distanza dal punto di riferimento
+#\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
-#df <- df %>%
-#  mutate(DISTANZA = distHaversine(cbind(LONGITUDE, LATITUDE), reference_point))
-#df <- df %>%
-#  mutate(DISTANZA = DISTANZA/1000)
+remove_problematic_variables <- function(df, vif_threshold = 10) {
+  # Rimuovi variabili aliased una alla volta
+  lm_fit <- lm(log(PRICE) ~ ., data = df)
+  alias_info <- alias(lm_fit)
+  aliased_vars <- rownames(alias_info$Complete)
+  while (length(aliased_vars) > 0) {
+    df <- df[, !colnames(df) %in% aliased_vars[1]]
+    lm_fit <- lm(log(PRICE) ~ ., data = df)
+    alias_info <- alias(lm_fit)
+    aliased_vars <- rownames(alias_info$Complete)
+  }
+  
+  # Rimuovi iterativamente le variabili con alto VIF
+  repeat {
+    lm_fit <- lm(log(PRICE) ~ ., data = df)
+    vif_values <- vif(lm_fit)
+    high_vif_vars <- trimws(gsub("`", "", names(vif_values)[vif_values > vif_threshold]))
+    if (length(high_vif_vars) == 0) {
+      break
+    }
+    df <- df[, !colnames(df) %in% high_vif_vars]
+  }
+  
+  return(df)
+}
 
-#cor(df$PRICE,df$LONGITUDE)
-#cor(df$PRICE,df$LATITUDE)
-#cor(df$PRICE,df$DISTANZA)
+# Utilizzo della nuova funzione per rimuovere le variabili problematiche
+df <- remove_problematic_variables(df)
+
+#///////////////////////////////////////////
 
 #dataset histogram
 dev.new()
@@ -58,11 +79,7 @@ summary(df$PROPERTYSQFT)
 summary(df$DISTANZA)
 
 #dataset correlation
-cor_matrix <- cor(df)
-cor_matrix_subset <- cor_matrix
-cor_matrix_subset[abs(cor_matrix) <= 0.05 ] <- NA
 
-#dataset grafici
 
 ggplot(df, aes(x = BEDS, y = PRICE)) +
   geom_point(aes(color = PRICE, size = PRICE)) +
@@ -92,14 +109,13 @@ ggplot(df, aes(x = PROPERTYSQFT, y = PRICE)) +
   theme(legend.position = "right")
 
 
-
+#//////////////////////////////////////////////////////////////////////////////
 # train 70% 30% test(-train)
 train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
 
-#linear regression
-lm_fit <- lm(log(PRICE) ~ ., data = df[train,])
-
-#linear regression results
+#linear regression 
+lm_fit<- lm(log(PRICE) ~ ., data = df[train,])
+vif(lm_fit)
 summary(lm_fit)
 dev.new()
 par(mfrow = c(2, 2))
@@ -179,7 +195,9 @@ abline(a = 0, b = 1, col = "red")
 
 #GAMs
 
+
 gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]);
+vif(gam_model)
 
 #gams correlation and fitted values
 fitt_value <- predict(gam_model,newdata = df[-train,])
