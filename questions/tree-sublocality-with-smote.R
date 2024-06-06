@@ -120,7 +120,7 @@ for (var in numeric_vars) {
 par(mfrow = c(1, 1))
 
 # Apply SMOTE to balance the classes
-balancedDf <- performanceEstimation::smote(SUBLOCALITY ~ ., df, perc.over = 50, perc.under = 100)
+balancedDf <- performanceEstimation::smote(SUBLOCALITY ~ ., df, perc.over = 25, perc.under = 50)
 
 # Remove missing values
 balancedDf <- na.omit(balancedDf)
@@ -246,8 +246,9 @@ bagging <- train(
 )
 bagging
 
-# Plot the bagging
-plot(varImp(bagging), main = "Variable Importance")
+# Plot the first 7 variables importance
+par(mfrow = c(1, 1))
+plot(varImp(bagging), main = "Variable Importance", top = 7)
 
 # Predict the test set
 predictions <- predict(bagging, newdata = testing_set, type = "raw")

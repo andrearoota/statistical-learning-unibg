@@ -1,226 +1,345 @@
-## (1) Define the packages that will be needed
-packages <- c('dplyr', 'ggplot2', 'caret', 'visNetwork', 'gbm')
-
-## (2) Install them if not yet installed
-installed_packages <- packages %in% rownames(installed.packages())
-if (any(installed_packages == FALSE)) {
-  install.packages(packages[!installed_packages])
-}
-
-## (3) Load the packages into R session
-invisible(lapply(packages, library, character.only = TRUE))
-library(readr)
-library(randomForest)
-library(tree)
+install.packages("performanceEstimation")
+install.packages("psych")
+install.packages("ggRandomForests")
+install.packages("kernlab")
+library(psych) # for general functions
+library(ggplot2) # for data visualization
+library(caret) # for training and cross validation (also calls other model libraries)
+library(rpart) # for trees
+library(rpart.plot) # Enhanced tree plots
+library(RColorBrewer) # Color selection for fancy tree plot
+library(party) # Alternative decision tree algorithm
+library(partykit) # Convert rpart object to BinaryTree
+library(pROC) # for ROC curves
+library(readr) # for reading in data
+library(dplyr) # for data manipulation
+library(corrplot) # for correlation plots
+library(kernlab) # for SVM
+library(performanceEstimation) # for SMOTE
+library(ggRandomForests) # for random forest plots
 
 # Set the seed for reproducibility
 set.seed(123)
 
-## Get data
+## Get data ##
 # Read the dataset from CSV file
 df <- read_csv("dataset/NY-House-Dataset 2.csv")
 df <- df[, -1]
 
+# Data structure
+head(df, 10)
+
+# Sample descriptives
+describe(df)
+
 # Check for missing data
 colSums(is.na(df))
 
+# Visualization of the distribution of numerical variables
+numeric_vars <- c("PRICE", "BEDS", "BATH", "PROPERTYSQFT")
+par(mfrow = c(2, 2))
+for (var in numeric_vars) {
+  hist(df[[var]], main = var, xlab = var)
+}
+par(mfrow = c(1, 1))
+
+# Correlation between numerical variables
+correlation_matrix <- cor(df[numeric_vars])
+corrplot(correlation_matrix, method = 'number', title = 'Correlation Matrix')
+
+# Feature engineering
+# Creation of interaction variables
+interaction_vars <- c("BEDS:BATH", "BATH:PROPERTYSQFT")
+df <- df %>%
+  mutate(
+    BEDS_BATH_interaction = BEDS * BATH,
+    BATH_PROPERTYSQFT_interaction = BATH * PROPERTYSQFT
+  )
+
 # Count unique values in each column
-sapply(df, function(x) n_distinct(x))
+sapply(df, function(x)
+  n_distinct(x))
 
 # Remove unused columns
-df <- df[, !(names(df) %in% c("ADDRESS", "STATE", "MAIN_ADDRESS", "ADMINISTRATIVE_AREA_LEVEL_2", "LOCALITY", "STREET_NAME", "LONG_NAME", "FORMATTED_ADDRESS"))]
+df <- df[, !(
+  names(df) %in% c(
+    "ADDRESS",
+    "STATE",
+    "MAIN_ADDRESS",
+    "ADMINISTRATIVE_AREA_LEVEL_2",
+    "LOCALITY",
+    "STREET_NAME",
+    "LONG_NAME",
+    "FORMATTED_ADDRESS"
+  )
+)]
 df <- df[, !(names(df) %in% c("LATITUDE", "LONGITUDE", "BROKERTITLE"))]
 
 # Filter the data based on selected variables
-vars <- c("PRICE","BEDS","BATH","PROPERTYSQFT")
+vars <- c("PRICE", "BEDS", "BATH", "PROPERTYSQFT")
 df_filtered <- df
 
-for (var in vars){
+for (var in vars) {
   Q1 <- quantile(df_filtered[[var]], 0.25)
   Q3 <- quantile(df_filtered[[var]], 0.75)
   
-  IQR <- Q3-Q1
-  lower_limit <- Q1-1.5*IQR
-  upper_limit <- Q3+1.5*IQR
+  IQR <- Q3 - Q1
+  lower_limit <- Q1 - 1.5 * IQR
+  upper_limit <- Q3 + 1.5 * IQR
   
-  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit & df_filtered[[var]] <= upper_limit, ]
+  df_filtered <- df_filtered[df_filtered[[var]] >= lower_limit &
+                               df_filtered[[var]] <= upper_limit, ]
 }
 df <- df_filtered
 
-# Factor
+# Factorize
 df$SUBLOCALITY <- as.factor(df$SUBLOCALITY)
 df$TYPE <- as.factor(df$TYPE)
 
-
-# Esamina la distribuzione dei valori nella colonna di predizione
+# Examine the distribution of values in the prediction column
 value_counts <- table(df$SUBLOCALITY)
 
-# Identifica i valori che compaiono meno di tre volte
+# Identify values that appear less than three times
 rare_values <- names(value_counts[value_counts < 3])
 
-# Crea una nuova categoria per i valori rari e assegna loro un nuovo valore
+# Create a new category for rare values and assign them a new value
 new_category <- "Others"
 
-# Aggiungi il nuovo livello alla variabile categorica
+# Add the new level to the categorical variable
 df$SUBLOCALITY <- factor(df$SUBLOCALITY, levels = c(levels(df$SUBLOCALITY), new_category))
 
-# Aggiorna il dataset sostituendo i valori rari con il nuovo valore
+# Update the dataset by replacing rare values with the new value
 df$SUBLOCALITY[df$SUBLOCALITY %in% rare_values] <- new_category
 df$SUBLOCALITY <- droplevels(df$SUBLOCALITY)
 
-## Define repeated cross validation with 5 folds and three repeats
-repeat_cv <- trainControl(method='repeatedcv', number=5, repeats=3)
+# Visualization of the distribution of numerical variables
+par(mfrow = c(2, 2))
+for (var in numeric_vars) {
+  hist(df[[var]], main = var, xlab = var)
+}
+par(mfrow = c(1, 1))
+
+# Correlation between numerical variables
+correlation_matrix <- cor(df[numeric_vars], use = "complete.obs")
+corrplot(correlation_matrix, method = 'number')
+
+# Visualization of the distribution of categorical variables
+categorical_vars <- c("SUBLOCALITY")
+ggplot(df, aes(x = SUBLOCALITY)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1) +
+          theme_minimal()) +
+  coord_flip()
+par(mfrow = c(1, 1))
+for (var in categorical_vars) {
+  barplot(table(df[[var]]), main = var)
+}
+par(mfrow = c(1, 1))
 
 ## Split the data so that we use 70% of it for training
-train_index <- createDataPartition(y=df$SUBLOCALITY, p=0.7, list=FALSE)
+train_index <- createDataPartition(y = df$SUBLOCALITY,
+                                   p = 0.7,
+                                   list = FALSE)
 
 ## Subset the data
 training_set <- df[train_index, ]
 testing_set <- df[-train_index, ]
 
-## Train a random forest model
-forest <- train(
-  
-  # Formula. We are using all variables to predict SUBLOCALITY
-  SUBLOCALITY~., 
-  
-  # Source of data; remove the Species variable
-  data=training_set, 
-  
-  # `rf` method for random forest
-  method='rf', 
-  
-  # Add repeated cross validation as trControl
-  trControl=repeat_cv,
-  
-  ntree=500,
-  
-  # Accuracy to measure the performance of the model
-  metric='Accuracy')
+## Define repeated cross validation with 5 folds and twenty repeats
+repeat_cv <- trainControl(
+  method = 'repeatedcv',
+  number = 10,
+  repeats = 3,
+  allowParallel = TRUE
+)
 
-## Print out the details about the model
-forest$finalModel
-plot(forest$finalModel)
+## Define number of trees
+ntree <- 500
 
-## Get variable importance, and turn into a data frame
-var_imp <- varImp(forest, scale=FALSE)$importance
-var_imp <- data.frame(variables=row.names(var_imp), importance=var_imp$Overall)
+## Classification tree
+classification_tree <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set,
+  method = "rpart2",
+  trControl = repeat_cv,
+  tuneLength = 10
+)
+classification_tree
 
-## Create a plot of variable importance
-var_imp %>%
-  
-  ## Sort the data by importance
-  arrange(importance) %>%
-  
-  ## Create a ggplot object for aesthetic
-  ggplot(aes(x=reorder(variables, importance), y=importance)) + 
-  
-  ## Plot the bar graph
-  geom_bar(stat='identity') + 
-  
-  ## Flip the graph to make a horizontal bar plot
-  coord_flip() + 
-  
-  ## Add x-axis label
-  xlab('Variables') +
-  
-  ## Add a title
-  labs(title='Random forest variable importance') + 
-  
-  ## Some layout for the plot
-  theme_minimal() + 
-  theme(axis.text = element_text(size = 10), 
-        axis.title = element_text(size = 15), 
-        plot.title = element_text(size = 20), 
-  )
+# Plot the decision tree
+plot(classification_tree, uniform = TRUE, compress = TRUE, main = "Classification Tree")
+rpart.plot(classification_tree$finalModel, main = "Classification Tree", type = 4, extra = 0, xcompact = FALSE, ycompress = TRUE, compress = TRUE, under = TRUE)
 
-## Generate predictions
-y_hats <- predict(
-  
-  ## Random forest object
-  object=forest, 
-  
-  ## Data to use for predictions; remove the SUBLOCALITY
-  newdata=testing_set[, -6])
+# Predict the test set
+predictions <- predict(classification_tree, newdata = testing_set, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set$SUBLOCALITY)
 
-## Print the accuracy
-accuracy <- mean(y_hats == testing_set$SUBLOCALITY)*100
-cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep='')
-
-plot(forest$finalModel)
-text(forest,pretty = 0)
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
 
-## train basic tree ##
-# Valuate performance with train and test data sets
-table(df$SUBLOCALITY[training_set])
+## Random forest ##
+random_forest <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set,
+  method = "rf",
+  trControl = repeat_cv,
+  ntree = ntree,
+  tuneLength = 10
+)
+random_forest
 
-tree_model <- tree( SUBLOCALITY ~ . , training_set, split = "gini", control=tree.control(1866496, mincut = 250, minsize=500))
+# Plot the random forest
+plot(random_forest, main = "Random Forest")
+plot(caret::varImp(random_forest), main = "Variable Importance")
+gg_dta<- gg_error(random_forest$finalModel)
+plot(gg_dta)
 
-# show result 
-summary(tree_model)
-plot(tree_model)
-text(tree_model,pretty = 0)
+# Predict the test set
+predictions <- predict(random_forest, newdata = testing_set, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set$SUBLOCALITY)
 
-## Do predict
-pred_value <- predict(tree_model, newdata = testing_set,type = "class")
-table(pred_value,testing_set$SUBLOCALITY)
-summary(pred_value)
-plot(pred_value)
-text(pred_value,pretty = 0)
-
-## Boosting ##
-library (gbm)
-ntree = 5000; 
-boost_model <- gbm(SUBLOCALITY ~ . , data = training_set, 
-                   distribution = "gaussian" , n.trees = ntree,
-                   interaction.depth = 4, shrinkage = 0.01 , verbose = F)
-boost_model
-
-yhat <- predict(boost_model, newdata = testing_set, n.trees = ntree)
-plot(testing_set$SUBLOCALITY, yhat, xlab = "Actual SUBLOCALITY", ylab = "Predicted SUBLOCALITY")
-
-## Generate predictions
-y_hats <- predict(
-  
-  ## Random forest object
-  object=boost_model, 
-  
-  ## Data to use for predictions; remove the SUBLOCALITY
-  newdata=testing_set[, -6])
-
-## Print the accuracy
-accuracy <- mean(y_hats == testing_set$SUBLOCALITY)*100
-cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep='')
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
 
 ## Bagging ##
+bagging <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set,
+  method = "treebag",
+  trControl = repeat_cv,
+  ntree = ntree,
+  tuneLength = 10
+)
+bagging
 
-#mtry = Number of variables randomly sampled as candidates at each split.
-#ntree = Number of trees to grow.
-bagg_model <- randomForest(SUBLOCALITY ~ . ,data = training_set,
-                           mtry = ncol(training_set)-1, importance = TRUE,replace = TRUE)
+# Plot the bagging
+plot(varImp(bagging), main = "Variable Importance")
 
-bagg_model
-plot(bagg_model)
+# Predict the test set
+predictions <- predict(bagging, newdata = testing_set, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set$SUBLOCALITY)
 
-# Make predictions on the testing set
-yhat <- predict(bagg_model, newdata = testing_set)
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
-# Plot predicted vs actual values
-plot(testing_set$SUBLOCALITY, yhat, xlab = "Actual SUBLOCALITY", ylab = "Predicted SUBLOCALITY")
-abline(0, 1, col = "red")  # Add a line of perfect prediction (y = x)
+## Boosting ##
+gbmGrid <-  expand.grid(
+  interaction.depth = 4,
+  n.trees = ntree,
+  shrinkage = 0.01,
+  n.minobsinnode = 10
+)
 
-accuracy <- mean(yhat == testing_set$SUBLOCALITY)*100
-cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep='')
+boosting <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set,
+  method = "gbm",
+  trControl = repeat_cv,
+  verbose = FALSE,
+  tuneLength = 10,
+  tuneGrid = gbmGrid
+)
+boosting
+
+# Predict the test set
+predictions <- predict(boosting, newdata = testing_set, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
 
-# how to change number of tree? 
-# add ntree oprion 
-bagg_model <- randomForest(medv ~ . ,data = Boston, subset = train,
-                           mtry = ncol(Boston)-1, importance = TRUE, ntree = 100)
-bagg_model
+## Support Vector Machine ##
+# Define the preprocessor
+preProc <- preProcess(training_set, method = c("center", "scale", "zv"))
 
-importance(bagg_model)
+# Apply the preprocessor to the training and testing sets
+training_set_preprocess <- predict(preProc, training_set)
+testing_set_preprocess <- predict(preProc, testing_set)
+
+svm <- train(
+  as.factor(SUBLOCALITY) ~ .,
+  data = training_set_preprocess,
+  method = "svmRadial",
+  trControl = repeat_cv,
+  tuneLength = 10
+)
+svm
+
+# Plot the SVM
+plot(svm)
+
+# Predict the test set
+predictions <- predict(svm, newdata = testing_set_preprocess, type = "raw")
+head(predictions)
+confusionMatrix(predictions, testing_set_preprocess$SUBLOCALITY)
+
+# Plot confusion matrix
+confMatrix <- confusionMatrix(predictions, testing_set_preprocess$SUBLOCALITY)
+dfConfMatrix <- as.data.frame(confMatrix$table)
+dfConfMatrix$Reference <- factor(dfConfMatrix$Reference, levels = rev(levels(dfConfMatrix$Reference)))
+ggplot(data = dfConfMatrix, aes(x = Prediction, y = Reference, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), vjust = 1) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
 
 
+## Compare models ##
+results <- resamples(
+  list(
+    ClassificationTree = classification_tree,
+    RandomForest = random_forest,
+    Bagging = bagging,
+    Boosting = boosting,
+    SVM = svm
+  )
+)
+summary(results)
+
+# Plot the results
+bwplot(results, metric = "Accuracy", main = "Model Comparison")
