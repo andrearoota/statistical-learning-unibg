@@ -29,38 +29,37 @@ graphics.off()  # close all plot
 df <- read_csv("dataset/NY-House-Dataset Price_clean.csv")
 df <- df[, -1]
 
-#\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-
-remove_problematic_variables <- function(df, vif_threshold = 10) {
-  # Rimuovi variabili aliased una alla volta
-  lm_fit <- lm(log(PRICE) ~ ., data = df)
-  alias_info <- alias(lm_fit)
-  aliased_vars <- rownames(alias_info$Complete)
-  while (length(aliased_vars) > 0) {
-    df <- df[, !colnames(df) %in% aliased_vars[1]]
-    lm_fit <- lm(log(PRICE) ~ ., data = df)
-    alias_info <- alias(lm_fit)
-    aliased_vars <- rownames(alias_info$Complete)
-  }
-  
-  # Rimuovi iterativamente le variabili con alto VIF
-  repeat {
-    lm_fit <- lm(log(PRICE) ~ ., data = df)
-    vif_values <- vif(lm_fit)
-    high_vif_vars <- trimws(gsub("`", "", names(vif_values)[vif_values > vif_threshold]))
-    if (length(high_vif_vars) == 0) {
-      break
-    }
-    df <- df[, !colnames(df) %in% high_vif_vars]
-  }
-  
-  return(df)
-}
-
-# Utilizzo della nuova funzione per rimuovere le variabili problematiche
-df <- remove_problematic_variables(df)
 
 #///////////////////////////////////////////
+
+# Calcola la matrice di correlazione
+cor_matrix <- cor(df)
+
+# Estrai la colonna di correlazioni con 'PRICE'
+cor_with_price <- cor_matrix[, "PRICE"]
+
+# Identifica le variabili con correlazione assoluta con 'PRICE' inferiore a 0.1
+low_cor_vars <- names(cor_with_price[abs(cor_with_price) < 0.1])
+
+# Rimuovi le variabili identificate dal dataset
+df <- df[, !colnames(df) %in% low_cor_vars]
+
+# Verifica il risultato
+print(colnames(df))
+
+
+#///////////////////////////////////////////
+
+
+lm_fit<- lm(log(PRICE) ~ ., data = df)
+vif(lm_fit)
+a<-alias(lm_fit)
+a$Complete
+df <- df[, !(names(df) %in% c("SUBLOCALITY_Others","TYPE_Others", "BROKERTITLE_Others"))]
+
+
+
+#///////////////////////////////////////////////
 
 #dataset histogram
 dev.new()
@@ -69,14 +68,14 @@ hist(df$PRICE)
 hist(df$BEDS)
 hist(df$BATH)
 hist(df$PROPERTYSQFT)
-hist(df$DISTANZA)
+
 
 #dataset summary
 summary(df$PRICE)
 summary(df$BATH)
 summary(df$BEDS)
 summary(df$PROPERTYSQFT)
-summary(df$DISTANZA)
+
 
 #dataset correlation
 
@@ -111,11 +110,11 @@ ggplot(df, aes(x = PROPERTYSQFT, y = PRICE)) +
 
 #//////////////////////////////////////////////////////////////////////////////
 # train 70% 30% test(-train)
-train <- sample(dim(df)[1],floor(dim(df)[1]*0.70),replace = FALSE);
+train <- sample(dim(df)[1], floor(dim(df)[1] * 0.70), replace = FALSE)
 
 #linear regression 
 lm_fit<- lm(log(PRICE) ~ ., data = df[train,])
-vif(lm_fit)
+
 summary(lm_fit)
 dev.new()
 par(mfrow = c(2, 2))
@@ -132,8 +131,8 @@ correlation_real <- cor(predicted_values, true_values)
 rmse_real <- sqrt(mean((true_values - predicted_values)^2))
 
 dev.new()
-plot(log_predictions, log_true_values, xlab = "Previsioni linear", ylab = "Valori Veri",
-     main = "Confronto tra Previsioni e Valori Veri (linear)")
+plot(log_predictions, log_true_values, xlab = "Predictions linear", ylab = "Actual Values",
+     main = "Comparison between Predictions and Actual Values (Linear Regression)")
 abline(a = 0, b = 1, col = "red")
 
 
@@ -162,18 +161,18 @@ rmse_ridge_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
 correlation_ridge_real <- cor(fitt_value_real, true_values_real)
 
 dev.new()
-plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
-     main = "Confronto tra Previsioni e Valori Veri (ridge)")
+plot(log_predictions, log_true_values, xlab = "Predictions Ridge", ylab = "Actual Values",
+     main = "Comparison between Predictions and Actual Values (Ridge Regression)")
 abline(a = 0, b = 1, col = "red")
 
-#lasso regression
+#Lasso regression
 cv_lasso <- cv.glmnet(x[train,],y[train],alpha=1,nfolds = 10);
 dev.new()
 plot(cv_lasso)
 opt_lambda <- cv_lasso$lambda.min;
 
 #lasso regression correlation and fitted values
-model <- glmnet(x[train,],y[train],alpha = 1,lambda = opt_lambda)
+model <- glmnet(x[train,],y[train],alpha = 1,lambda = opt_lambda, standardize = TRUE)
 
 
 fitt_value <- predict(model,s=opt_lambda, newx=x[-train,])
@@ -188,21 +187,20 @@ correlation_lasso_real <- cor(fitt_value_real, true_values_real)
 
 
 dev.new()
-plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
-     main = "Confronto tra Previsioni e Valori Veri (lasso)")
+plot(log_predictions, log_true_values, xlab = "Predictions Lasso", ylab = "Actual Values",
+     main = "Comparison between Predictions and Actual Values (Lasso Regression)")
 abline(a = 0, b = 1, col = "red")
-
 
 #GAMs
 
 
-gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+., data = df[train,]);
-vif(gam_model)
+gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+poly(PROPERTYSQFT,4)+., data = df[train,]);
+
 
 #gams correlation and fitted values
 fitt_value <- predict(gam_model,newdata = df[-train,])
 true_values <- log(df$PRICE[-train])
-err = (log(df$PRICE) - predict(gam_model, df))^2
+err = (true_values - fitt_value)^2
 rmse_GAMs = sqrt(mean(err[-train]))
 correlation_GAMs <- cor(fitt_value, true_values)
 
@@ -213,12 +211,31 @@ rmse_GAMs_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
 correlation_GAMs_real <- cor(fitt_value_real, true_values_real)
 
 dev.new()
-plot(fitt_value, true_values, xlab = "Previsioni", ylab = "Valori Veri",
-     main = "Confronto tra Previsioni e Valori Veri (GAMs)")
+plot(log_predictions, log_true_values, xlab = "Predictions GAMs", ylab = "Actual Values",
+     main = "Comparison between Predictions and Actual Values (GAMs)")
 abline(a = 0, b = 1, col = "red")
 
 
 #SVR
+
+standardize_dataset <- function(df) {
+  # Separazione della variabile target
+  target <- df$PRICE
+  predictors <- df[, colnames(df) != "PRICE"]
+  
+  # Centrare e scalare le variabili predittive
+  scaler <- preProcess(predictors, method = c("center", "scale"))
+  predictors_scaled <- predict(scaler, predictors)
+  
+  # Combinazione delle variabili scalate con la variabile target
+  df_scaled <- cbind(predictors_scaled, PRICE = target)
+  
+  return(list(scaled_data = df_scaled, scaler = scaler))
+}
+
+# Applicazione della standardizzazione all'intero dataset
+standardized <- standardize_dataset(df)
+df <- standardized$scaled_data
 
 train_data <- df[train, ]
 test_data <- df[-train, ]
@@ -237,19 +254,21 @@ correlation_SVR <- cor(predictions, Y_test)
 #valutazione
 
    
-  data <- data.frame(
-    Method = c("Linear", "Lasso", "Ridge", "GAMs"),
-    Correlation = round(c(correlation_linear,correlation_lasso,correlation_ridge,correlation_GAMs),3),
-    RMSE_Test = round(c(rmse_linear,rmse_lasso,rmse_ridge,rmse_GAMs),3)
-  )
-  
-  data$RMSE_Test <- sprintf("%.3f  $", data$RMSE_Test)
-  
-  table <- kable(data, format = "html", caption = "Correlation and RMSEtest") %>%
-    kable_styling(full_width = FALSE) %>%
-    column_spec(1, bold = TRUE) %>%
-    column_spec(2:3, width = "4cm") %>%
-    add_header_above(c(" " = 1, Metrics="2"))
-  
-  # Visualizzazione della tabella
-  table
+data <- data.frame(
+  Method = c("Linear", "Lasso", "Ridge", "GAMs"),
+  Correlation_Log = round(c(correlation_log, correlation_lasso, correlation_ridge, correlation_GAMs), 3),
+  Correlation = round(c(correlation_real, correlation_lasso_real, correlation_ridge_real, correlation_GAMs_real), 3),
+  RMSE_Test = round(c(rmse_real, rmse_lasso_real, rmse_ridge_real, rmse_GAMs_real))
+)
+
+# Ensure RMSE_Test is displayed as integer
+data$RMSE_Test <- as.integer(data$RMSE_Test)
+
+table <- kable(data, format = "html", caption = "Correlation and RMSE Test") %>%
+  kable_styling(full_width = FALSE) %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:4, width = "4cm") %>%
+  add_header_above(c(" " = 1, "Metrics" = 3))
+
+# Display the table
+table
