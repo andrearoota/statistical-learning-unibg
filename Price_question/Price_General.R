@@ -161,7 +161,7 @@ rmse_ridge_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
 correlation_ridge_real <- cor(fitt_value_real, true_values_real)
 
 dev.new()
-plot(log_predictions, log_true_values, xlab = "Predictions Ridge", ylab = "Actual Values",
+plot(fitt_value, true_values, xlab = "Predictions Ridge", ylab = "Actual Values",
      main = "Comparison between Predictions and Actual Values (Ridge Regression)")
 abline(a = 0, b = 1, col = "red")
 
@@ -187,14 +187,15 @@ correlation_lasso_real <- cor(fitt_value_real, true_values_real)
 
 
 dev.new()
-plot(log_predictions, log_true_values, xlab = "Predictions Lasso", ylab = "Actual Values",
+plot(fitt_value, true_values, xlab = "Predictions Lasso", ylab = "Actual Values",
      main = "Comparison between Predictions and Actual Values (Lasso Regression)")
 abline(a = 0, b = 1, col = "red")
 
 #GAMs
 
 
-gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)+poly(PROPERTYSQFT,4)+., data = df[train,]);
+gam_model <- gam(log(PRICE) ~ s(BEDS,4) + s(BATH,4)
+                 +poly(PROPERTYSQFT,4)+., data = df[train,]);
 
 
 #gams correlation and fitted values
@@ -211,7 +212,7 @@ rmse_GAMs_real <- sqrt(mean((true_values_real - fitt_value_real)^2))
 correlation_GAMs_real <- cor(fitt_value_real, true_values_real)
 
 dev.new()
-plot(log_predictions, log_true_values, xlab = "Predictions GAMs", ylab = "Actual Values",
+plot(fitt_value,true_values , xlab = "Predictions GAMs", ylab = "Actual Values",
      main = "Comparison between Predictions and Actual Values (GAMs)")
 abline(a = 0, b = 1, col = "red")
 
@@ -271,4 +272,29 @@ table <- kable(data, format = "html", caption = "Correlation and RMSE Test") %>%
   add_header_above(c(" " = 1, "Metrics" = 3))
 
 # Display the table
+table
+
+
+
+#////////////////////////////////////////////////////////////////////////////////////
+  
+
+  data <- data.frame(
+    Method = c("Linear", "GAMs"),
+    Correlation_Log = round(c(correlation_log, correlation_GAMs), 3),
+    Correlation = round(c(correlation_real, correlation_GAMs_real), 3),
+    RMSE_Test = round(c(rmse_real, rmse_GAMs_real))
+  )
+
+# Assicurati che RMSE_Test venga visualizzato come intero
+data$RMSE_Test <- as.integer(data$RMSE_Test)
+
+# Crea la tabella
+table <- kable(data, format = "html", caption = "Correlation and RMSE Test for Linear and GAMs") %>%
+  kable_styling(full_width = FALSE) %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2:4, width = "4cm") %>%
+  add_header_above(c(" " = 1, "Metrics" = 3))
+
+# Visualizza la tabella
 table
